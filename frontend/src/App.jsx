@@ -24,7 +24,7 @@ export default function App() {
     }, [currentSong])
 
     useEffect(() => {
-        socketRef.current = io("http://localhost:8000")
+        socketRef.current = io("https://musicsync-si4a.onrender.com/")
         socketRef.current.on("connect", () => {
             console.log("socket connected")
         })
