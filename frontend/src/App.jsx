@@ -48,7 +48,7 @@ export default function App() {
     }, [])
 
     const fetchSongs = async () => {
-        const res = await fetch("http://localhost:5000/songs");
+        const res = await fetch("192.168.1.3:5000/songs");
         const data = await res.json();
         setSongs(data);
     };
