@@ -6,7 +6,11 @@ const cors = require('cors')
 
 const PORT = 5000
 
-app.use(cors())
+app.use(cors({
+    origin: "https://music-sync-peach.vercel.app",
+    methods: ["GET", "POST"],
+    credentials: true
+}))
 
 app.use('/music', express.static('D:/GetMusicDownloads'))
 
