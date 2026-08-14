@@ -106,7 +106,7 @@ export default function App() {
                 onClick={async () => {
                     if (songName.trim() && artistName.trim()) setLoading(true);
 
-                    await fetch("http://localhost:3000/download", {
+                    await fetch("http://localhost:8000/api/download", {
                         method: "POST",
                         headers: {
                             "Content-Type": "application/json",

@@ -7,7 +7,7 @@ const cors = require('cors')
 const PORT = 5000
 
 app.use(cors({
-    origin: "https://music-sync-peach.vercel.app",
+    origin: "*",
     methods: ["GET", "POST"],
     credentials: true
 }))
@@ -18,12 +18,10 @@ app.get("/", (req, res) => res.send("Server running"))
 
 app.get('/songs', (req, res) => {
     const dirPath = 'D:/GetMusicDownloads';
-
     fs.readdir(dirPath, (err, files) => {
         if (err) return res.status(500).json({ error: 'Unable to read folder' });
-
-        const songs = files.filter(file => file.endsWith('.mp3'));
-
+        
+        const songs = files;
         res.json(songs);
     });
 });
