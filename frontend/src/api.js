@@ -27,10 +27,9 @@ export async function fetchSongs() {
     return Array.isArray(data.songs) ? data.songs : []
 }
 
-export async function uploadSong({ file, artist, album }) {
+export async function uploadSong({ files, artist, album }) {
     const formData = new FormData()
-    formData.append('song', file)
-    formData.append('title', file.name.trim().replace(/\.mp3$/i, '').trim())
+    files.forEach((file) => formData.append('song', file))
     formData.append('artist', artist.trim())
     formData.append('album', album.trim())
 
@@ -41,11 +40,11 @@ export async function uploadSong({ file, artist, album }) {
 
     const data = await parseResponse(response, 'Failed to upload song.')
 
-    if (!data.song) {
-        throw new Error('The upload response did not include the created song.')
+    if (!Array.isArray(data.songs) || data.songs.length === 0) {
+        throw new Error('The upload response did not include the created songs.')
     }
 
-    return data.song
+    return data.songs
 }
 
 export { API_BASE_URL, SOCKET_URL }

@@ -10,7 +10,7 @@ function titleFromFileName(fileName) {
 
 export default function UploadSong({ onSongUploaded }) {
     const fileInputRef = useRef(null)
-    const [selectedFile, setSelectedFile] = useState(null)
+    const [selectedFiles, setSelectedFiles] = useState([])
     const [artist, setArtist] = useState('')
     const [album, setAlbum] = useState('')
     const [uploading, setUploading] = useState(false)
@@ -18,33 +18,36 @@ export default function UploadSong({ onSongUploaded }) {
     const [error, setError] = useState('')
 
     function handleFileChange(event) {
-        const file = event.target.files?.[0]
+        const files = Array.from(event.target.files || [])
         setMessage('')
         setError('')
 
-        if (!file) {
-            setSelectedFile(null)
+        if (files.length === 0) {
+            setSelectedFiles([])
             return
         }
 
-        const isMp3 = file.name.toLowerCase().endsWith('.mp3')
-        const hasAudioMimeType = !file.type || ['audio/mpeg', 'audio/mp3'].includes(file.type)
+        const invalidFile = files.find((file) => {
+            const isMp3 = file.name.toLowerCase().endsWith('.mp3')
+            const hasAudioMimeType = !file.type || ['audio/mpeg', 'audio/mp3'].includes(file.type)
+            return !isMp3 || !hasAudioMimeType || file.size > MAX_FILE_SIZE
+        })
 
-        if (!isMp3 || !hasAudioMimeType) {
-            setSelectedFile(null)
-            setError('Please choose an MP3 file.')
+        if (invalidFile && (!invalidFile.name.toLowerCase().endsWith('.mp3') || (invalidFile.type && !['audio/mpeg', 'audio/mp3'].includes(invalidFile.type)))) {
+            setSelectedFiles([])
+            setError('Please choose MP3 files only.')
             event.target.value = ''
             return
         }
 
-        if (file.size > MAX_FILE_SIZE) {
-            setSelectedFile(null)
-            setError(`The MP3 file must be ${MAX_FILE_SIZE_MB} MB or smaller.`)
+        if (invalidFile) {
+            setSelectedFiles([])
+            setError(`Each MP3 file must be ${MAX_FILE_SIZE_MB} MB or smaller.`)
             event.target.value = ''
             return
         }
 
-        setSelectedFile(file)
+        setSelectedFiles(files)
     }
 
     async function handleSubmit(event) {
@@ -52,18 +55,18 @@ export default function UploadSong({ onSongUploaded }) {
         setMessage('')
         setError('')
 
-        if (!selectedFile) {
-            setError('Please choose an MP3 file first.')
+        if (selectedFiles.length === 0) {
+            setError('Please choose at least one MP3 file first.')
             return
         }
 
         setUploading(true)
 
         try {
-            const song = await uploadSong({ file: selectedFile, artist, album })
-            onSongUploaded(song)
-            setMessage('Song added to your library.')
-            setSelectedFile(null)
+            const songs = await uploadSong({ files: selectedFiles, artist, album })
+            onSongUploaded(songs)
+            setMessage(`${songs.length} ${songs.length === 1 ? 'song' : 'songs'} added to your library.`)
+            setSelectedFiles([])
             setArtist('')
             setAlbum('')
 
@@ -90,13 +93,17 @@ export default function UploadSong({ onSongUploaded }) {
 
             <form className="upload-form" onSubmit={handleSubmit}>
                 <label className="file-dropzone">
-                    <input ref={fileInputRef} type="file" accept="audio/mpeg,audio/mp3,.mp3" onChange={handleFileChange} />
+                    <input ref={fileInputRef} type="file" accept="audio/mpeg,audio/mp3,.mp3" multiple onChange={handleFileChange} />
                     <span className="file-mark" aria-hidden="true">♫</span>
-                    <strong>{selectedFile ? selectedFile.name : 'Choose an MP3 file'}</strong>
-                    <span>Up to {MAX_FILE_SIZE_MB} MB</span>
+                    <strong>{selectedFiles.length ? `${selectedFiles.length} MP3 files selected` : 'Choose MP3 files'}</strong>
+                    <span>Up to {MAX_FILE_SIZE_MB} MB each</span>
                 </label>
 
-                {selectedFile && <p className="derived-title">Title: {titleFromFileName(selectedFile.name)}</p>}
+                {selectedFiles.length > 0 && (
+                    <p className="derived-title">
+                        {selectedFiles.map((file) => titleFromFileName(file.name)).join(', ')}
+                    </p>
+                )}
 
                 <label className="form-field">
                     <span>Artist <em>optional</em></span>

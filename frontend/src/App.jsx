@@ -104,9 +104,12 @@ export default function App() {
         }
     }
 
-    function handleSongUploaded(song) {
-        setSongs((previousSongs) => [song, ...previousSongs.filter((item) => item._id !== song._id)])
-        selectSong(song)
+    function handleSongUploaded(uploadedSongs) {
+        setSongs((previousSongs) => [
+            ...uploadedSongs,
+            ...previousSongs.filter((song) => !uploadedSongs.some((item) => item._id === song._id))
+        ])
+        selectSong(uploadedSongs[0])
     }
 
     function emitPlaybackEvent(event, position) {
