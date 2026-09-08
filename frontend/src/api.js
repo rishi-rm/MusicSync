@@ -47,4 +47,20 @@ export async function uploadSong({ files, artist, album }) {
     return data.songs
 }
 
+export async function updateSongFavorite(songId, isFavorite) {
+    const response = await fetch(`${API_BASE_URL}/songs/${songId}/favorite`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isFavorite })
+    })
+
+    const data = await parseResponse(response, 'Failed to update favourite status.')
+
+    if (!data.song) {
+        throw new Error('The favourite response did not include the updated song.')
+    }
+
+    return data.song
+}
+
 export { API_BASE_URL, SOCKET_URL }

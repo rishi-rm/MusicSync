@@ -46,15 +46,24 @@ h2 { margin-top: 5px; color: #fff7ed; font-size: 1.7rem; font-weight: 400; }
 .search-field { gap: 9px; border-bottom: 1px solid rgba(245, 240, 232, 0.2); margin-bottom: 15px; padding: 8px 2px 11px; color: #e59a5c; }
 .search-field input, .form-field input { width: 100%; border: 0; outline: 0; background: transparent; color: #fff7ed; }
 .search-field input::placeholder, .form-field input::placeholder { color: #7f9187; }
-.song-list { display: grid; gap: 5px; }
+.song-list { display: grid; max-height: clamp(300px, 48vh, 540px); gap: 5px; overflow-y: auto; padding-right: 4px; overscroll-behavior: contain; }
 .song-row { width: 100%; gap: 13px; border: 1px solid transparent; border-radius: 2px; padding: 13px 10px; background: transparent; cursor: pointer; text-align: left; transition: background 160ms ease, border-color 160ms ease; }
+.song-row { position: relative; }
 .song-row:hover, .song-row.selected { border-color: rgba(229, 154, 92, 0.25); background: rgba(229, 154, 92, 0.09); }
 .song-index { width: 22px; color: #e59a5c; text-align: center; }
+.song-index.favorite { color: #f2c56e; }
 .song-copy { display: grid; min-width: 0; flex: 1; gap: 4px; }
 .song-copy strong { overflow: hidden; color: #f8eee2; font-size: 1rem; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
 .song-copy span, .song-meta, .form-field, .file-dropzone, .player-status, .player-note { color: #8fa198; font-family: 'Trebuchet MS', sans-serif; font-size: 0.73rem; }
 .song-meta { display: grid; gap: 3px; max-width: 120px; text-align: right; }
 .song-meta small { color: #65766f; font-size: 0.65rem; }
+.song-menu-wrap { position: relative; flex: 0 0 auto; }
+.song-menu-button { display: grid; width: 36px; height: 36px; place-items: center; border: 0; border-radius: 50%; background: transparent; color: #b5c3bc; cursor: pointer; font-size: 1.35rem; line-height: 1; }
+.song-menu-button:hover, .song-menu-button:focus-visible { background: rgba(229, 154, 92, 0.16); color: #f8eee2; outline: none; }
+.song-menu { position: absolute; z-index: 2; top: calc(100% + 4px); right: 0; min-width: 190px; border: 1px solid rgba(245, 240, 232, 0.18); background: #18221f; box-shadow: 0 12px 25px rgba(0, 0, 0, 0.3); }
+.song-menu button { width: 100%; border: 0; padding: 11px 13px; background: transparent; color: #f5f0e8; cursor: pointer; font-family: 'Trebuchet MS', sans-serif; font-size: 0.73rem; text-align: left; }
+.song-menu button:hover, .song-menu button:focus-visible { background: rgba(229, 154, 92, 0.14); outline: none; }
+.song-menu button:disabled { cursor: wait; opacity: 0.55; }
 .state-message { padding: 35px 10px; color: #91a49b; font-family: 'Trebuchet MS', sans-serif; font-size: 0.83rem; line-height: 1.5; }
 .error-message { color: #f2a18b; }
 .success-message { color: #a8d790; font-family: 'Trebuchet MS', sans-serif; font-size: 0.78rem; }
@@ -89,6 +98,7 @@ h2 { margin-top: 5px; color: #fff7ed; font-size: 1.7rem; font-weight: 400; }
     .intro-block { padding: 58px 0 34px; }
     .content-grid { grid-template-columns: 1fr; }
     .panel { padding: 20px; }
+    .song-list { max-height: min(52vh, 420px); }
     .player-panel { grid-template-columns: auto minmax(0, 1fr); padding: 18px; }
     .player-status { grid-column: 2; }
     .player-progress { grid-column: 1 / -1; }

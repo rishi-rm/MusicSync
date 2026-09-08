@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
-import { fetchSongs, SOCKET_URL } from './api.js'
+import { fetchSongs, SOCKET_URL, updateSongFavorite } from './api.js'
 import MusicPlayer from './components/MusicPlayer.jsx'
 import SongLibrary from './components/SongLibrary.jsx'
 import UploadSong from './components/UploadSong.jsx'
@@ -11,6 +11,8 @@ export default function App() {
     const [searchQuery, setSearchQuery] = useState('')
     const [loadingSongs, setLoadingSongs] = useState(true)
     const [songsError, setSongsError] = useState('')
+    const [favoriteError, setFavoriteError] = useState('')
+    const [favoriteUpdatingId, setFavoriteUpdatingId] = useState(null)
     const [remotePlaybackCommand, setRemotePlaybackCommand] = useState(null)
     const songsRef = useRef([])
     const socketRef = useRef(null)
@@ -112,6 +114,31 @@ export default function App() {
         selectSong(uploadedSongs[0])
     }
 
+    async function handleFavoriteChange(song) {
+        const previousFavorite = Boolean(song.isFavorite)
+        const nextFavorite = !previousFavorite
+        setFavoriteError('')
+        setFavoriteUpdatingId(song._id)
+        setSongs((previousSongs) => previousSongs.map((item) => (
+            item._id === song._id ? { ...item, isFavorite: nextFavorite } : item
+        )))
+
+        try {
+            const updatedSong = await updateSongFavorite(song._id, nextFavorite)
+            setSongs((previousSongs) => previousSongs.map((item) => (
+                item._id === updatedSong._id ? updatedSong : item
+            )))
+            setCurrentSong((current) => current?._id === updatedSong._id ? updatedSong : current)
+        } catch (error) {
+            setSongs((previousSongs) => previousSongs.map((item) => (
+                item._id === song._id ? { ...item, isFavorite: previousFavorite } : item
+            )))
+            setFavoriteError(error instanceof Error ? error.message : 'Failed to update favourite status.')
+        } finally {
+            setFavoriteUpdatingId(null)
+        }
+    }
+
     function emitPlaybackEvent(event, position) {
         if (!socketRef.current?.connected || !currentSong?._id) return
 
@@ -131,7 +158,15 @@ export default function App() {
         return [song.title, song.artist, song.album]
             .filter(Boolean)
             .some((value) => value.toLowerCase().includes(normalizedQuery))
-    })
+    }).map((song, index) => ({ song, index }))
+        .sort((left, right) => {
+            const favoriteOrder = Number(Boolean(right.song.isFavorite)) - Number(Boolean(left.song.isFavorite))
+            if (favoriteOrder !== 0) return favoriteOrder
+
+            const titleOrder = (left.song.title || '').localeCompare(right.song.title || '', undefined, { sensitivity: 'base' })
+            return titleOrder || left.index - right.index
+        })
+        .map(({ song }) => song)
 
     return (
         <main className="app-shell">
@@ -162,8 +197,11 @@ export default function App() {
                     searchQuery={searchQuery}
                     onSearchChange={setSearchQuery}
                     onSelectSong={selectSong}
+                    onFavoriteChange={handleFavoriteChange}
+                    favoriteUpdatingId={favoriteUpdatingId}
                     loading={loadingSongs}
                     error={songsError}
+                    favoriteError={favoriteError}
                 />
                 <UploadSong onSongUploaded={handleSongUploaded} />
             </div>

@@ -32,6 +32,7 @@ const frontendOrigins = process.env.FRONTEND_ORIGINS
     : '*'
 
 app.use(cors({ origin: frontendOrigins }))
+app.use(express.json())
 const server = http.createServer(app)
 
 const io = new Server(server, {
@@ -58,6 +59,33 @@ app.get('/songs', async (req, res) => {
     } catch (error) {
         console.error('Failed to retrieve songs:', error.message)
         return res.status(500).json({ success: false, message: 'Failed to retrieve songs.' })
+    }
+})
+
+app.patch('/songs/:id/favorite', async (req, res) => {
+    const { id: songId } = req.params
+
+    if (!mongoose.Types.ObjectId.isValid(songId)) {
+        return res.status(400).json({ success: false, message: 'Invalid song ID.' })
+    }
+
+    if (typeof req.body?.isFavorite !== 'boolean') {
+        return res.status(400).json({ success: false, message: 'isFavorite must be a boolean.' })
+    }
+
+    try {
+        const song = await Song.findById(songId)
+        if (!song) {
+            return res.status(404).json({ success: false, message: 'Song not found.' })
+        }
+
+        song.isFavorite = req.body.isFavorite
+        await song.save()
+
+        return res.json({ success: true, song })
+    } catch (error) {
+        console.error('Failed to update song favourite:', error.message)
+        return res.status(500).json({ success: false, message: 'Failed to update favourite status.' })
     }
 })
 

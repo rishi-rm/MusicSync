@@ -32,6 +32,10 @@ const songSchema = new mongoose.Schema({
     playCount: {
         type: Number,
         default: 0
+    },
+    isFavorite: {
+        type: Boolean,
+        default: false
     }
 }, { timestamps: true })
 
