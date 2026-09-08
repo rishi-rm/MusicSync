@@ -14,6 +14,7 @@ body {
     margin: 0;
     min-width: 320px;
     min-height: 100vh;
+    overflow-x: hidden;
     background: radial-gradient(circle at 85% 12%, rgba(204, 134, 66, 0.17), transparent 28rem), linear-gradient(135deg, #101515 0%, #172121 54%, #24372f 100%);
 }
 
@@ -96,11 +97,39 @@ h2 { margin-top: 5px; color: #fff7ed; font-size: 1.7rem; font-weight: 400; }
 
 @media (max-width: 760px) {
     .app-shell { --player-space: 250px; width: min(100% - 28px, 560px); padding-top: 18px; }
+    .app-header { align-items: flex-start; }
+    .brand-tagline { max-width: 185px; line-height: 1.35; }
     .intro-block { padding: 58px 0 34px; }
     .content-grid { grid-template-columns: 1fr; }
     .panel { padding: 20px; }
     .song-list { max-height: min(52vh, 420px); }
-    .player-panel { width: min(100% - 28px, 560px); grid-template-columns: auto minmax(0, 1fr); padding: 18px; }
+    .player-panel { bottom: env(safe-area-inset-bottom); width: min(100% - 28px, 560px); grid-template-columns: 52px minmax(0, 1fr); gap: 12px; padding: 15px 16px calc(15px + env(safe-area-inset-bottom)); }
+    .player-art { width: 52px; height: 52px; font-size: 1.5rem; }
+    .player-copy h2 { font-size: 1.35rem; }
     .player-status { grid-column: 2; }
     .player-progress { grid-column: 1 / -1; }
+    .player-controls { gap: 16px; padding-top: 12px; }
+    .player-controls button { width: 44px; height: 44px; }
+    .player-controls .play-button { width: 48px; height: 48px; }
+}
+
+@media (max-width: 480px) {
+    .app-shell { --player-space: 285px; width: calc(100% - 24px); padding-bottom: var(--player-space); }
+    .app-header { padding-bottom: 16px; }
+    .brand-mark { width: 38px; height: 38px; font-size: 24px; }
+    .brand-lockup { gap: 9px; }
+    .brand-name { font-size: 1.05rem; }
+    .brand-tagline { font-size: 0.66rem; }
+    .panel { min-height: 0; padding: 16px; }
+    .section-heading { margin-bottom: 16px; }
+    h2 { font-size: 1.45rem; }
+    .song-row { gap: 9px; padding: 12px 6px; }
+    .song-index { width: 20px; }
+    .song-meta { display: none; }
+    .song-menu-button { width: 40px; height: 40px; }
+    .player-panel { width: calc(100% - 24px); }
+    .player-copy p:not(.eyebrow) { font-size: 0.68rem; }
+    .player-progress { gap: 7px; }
+    .player-progress input { min-width: 0; }
+    .player-controls { gap: 11px; }
 }
