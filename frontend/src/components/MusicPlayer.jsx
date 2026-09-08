@@ -1,0 +1,159 @@
+import { useEffect, useRef, useState } from 'react'
+import { API_BASE_URL } from '../api.js'
+
+function formatTime(seconds) {
+    if (!Number.isFinite(seconds)) return '0:00'
+
+    const minutes = Math.floor(seconds / 60)
+    const remainingSeconds = Math.floor(seconds % 60).toString().padStart(2, '0')
+    return `${minutes}:${remainingSeconds}`
+}
+
+export default function MusicPlayer({ song, socketConnected, remotePlaybackCommand, onLocalPlay, onLocalPause, onLocalSeek }) {
+    const audioRef = useRef(null)
+    const [isPlaying, setIsPlaying] = useState(false)
+    const [currentTime, setCurrentTime] = useState(0)
+    const [duration, setDuration] = useState(0)
+    const [playbackError, setPlaybackError] = useState('')
+
+    useEffect(() => {
+        const audio = audioRef.current
+        if (!audio) return undefined
+
+        audio.pause()
+        audio.currentTime = 0
+
+        if (song?._id) {
+            audio.src = `${API_BASE_URL}/songs/${encodeURIComponent(song._id)}/stream`
+            audio.load()
+        } else {
+            audio.removeAttribute('src')
+            audio.load()
+        }
+
+        const handleLoadedMetadata = () => setDuration(audio.duration)
+        const handleTimeUpdate = () => setCurrentTime(audio.currentTime)
+        const handlePlay = () => setIsPlaying(true)
+        const handlePause = () => setIsPlaying(false)
+        const handleEnded = () => {
+            setIsPlaying(false)
+            setCurrentTime(0)
+        }
+        const handleError = () => {
+            setPlaybackError('Unable to load this song from storage.')
+            setIsPlaying(false)
+        }
+
+        audio.addEventListener('loadedmetadata', handleLoadedMetadata)
+        audio.addEventListener('timeupdate', handleTimeUpdate)
+        audio.addEventListener('play', handlePlay)
+        audio.addEventListener('pause', handlePause)
+        audio.addEventListener('ended', handleEnded)
+        audio.addEventListener('error', handleError)
+
+        return () => {
+            audio.pause()
+            audio.removeEventListener('loadedmetadata', handleLoadedMetadata)
+            audio.removeEventListener('timeupdate', handleTimeUpdate)
+            audio.removeEventListener('play', handlePlay)
+            audio.removeEventListener('pause', handlePause)
+            audio.removeEventListener('ended', handleEnded)
+            audio.removeEventListener('error', handleError)
+        }
+    }, [song?._id])
+
+    useEffect(() => {
+        const audio = audioRef.current
+        if (!audio || !remotePlaybackCommand || !song?._id) return
+        if (remotePlaybackCommand.songId && remotePlaybackCommand.songId !== song._id) return
+
+        if (Number.isFinite(remotePlaybackCommand.position)) {
+            audio.currentTime = remotePlaybackCommand.position
+        }
+
+        if (remotePlaybackCommand.type === 'play') {
+            audio.play().catch((error) => {
+                console.error('Remote audio playback could not start:', error)
+                setPlaybackError('Remote playback could not start on this device.')
+            })
+        }
+
+        if (remotePlaybackCommand.type === 'pause') {
+            audio.pause()
+        }
+    }, [remotePlaybackCommand, song?._id])
+
+    async function handlePlay() {
+        const audio = audioRef.current
+        if (!audio || !song) return
+
+        setPlaybackError('')
+
+        try {
+            await audio.play()
+            onLocalPlay?.(audio.currentTime)
+        } catch (error) {
+            console.error('Audio playback could not start:', error)
+            setPlaybackError('Playback was blocked or the audio could not be loaded.')
+            setIsPlaying(false)
+        }
+    }
+
+    function handlePause() {
+        const audio = audioRef.current
+        if (!audio) return
+
+        audio.pause()
+        onLocalPause?.(audio.currentTime)
+    }
+
+    function handleSeek(event) {
+        const audio = audioRef.current
+        if (!audio) return
+
+        const nextTime = Number(event.target.value)
+        audio.currentTime = nextTime
+        setCurrentTime(nextTime)
+        onLocalSeek?.(nextTime)
+    }
+
+    const hasSong = Boolean(song?._id)
+
+    return (
+        <section className="player-panel" aria-labelledby="player-heading">
+            <audio ref={audioRef} preload="metadata" />
+            <div className="player-art" aria-hidden="true">♫</div>
+            <div className="player-copy">
+                <p className="eyebrow">Now selected</p>
+                <h2 id="player-heading">{song ? song.title : 'Choose a song'}</h2>
+                <p>{song ? `${song.artist || 'Unknown Artist'}${song.album ? ` · ${song.album}` : ''}` : 'Select a track from your library to prepare playback.'}</p>
+            </div>
+            <div className="player-status">
+                <span className={`status-dot${socketConnected ? ' online' : ''}`} />
+                {socketConnected ? 'Socket connected' : 'Playback offline'}
+            </div>
+            <div className="player-progress">
+                <span>{formatTime(currentTime)}</span>
+                <input
+                    aria-label="Seek through song"
+                    type="range"
+                    min="0"
+                    max={duration || 0}
+                    step="0.1"
+                    value={Math.min(currentTime, duration || 0)}
+                    onChange={handleSeek}
+                    disabled={!hasSong || !duration}
+                />
+                <span>{formatTime(duration)}</span>
+            </div>
+            <div className="player-controls" aria-label="Playback controls">
+                <button type="button" onClick={() => { audioRef.current.currentTime = 0 }} disabled={!hasSong} aria-label="Restart song">↺</button>
+                <button className="play-button" type="button" onClick={isPlaying ? handlePause : handlePlay} disabled={!hasSong} aria-label={isPlaying ? 'Pause song' : 'Play song'}>
+                    {isPlaying ? 'Ⅱ' : '▶'}
+                </button>
+                <button type="button" onClick={() => { audioRef.current.currentTime = duration }} disabled={!hasSong || !duration} aria-label="End song">↻</button>
+            </div>
+            {playbackError && <p className="player-note error-message">{playbackError}</p>}
+        </section>
+    )
+}

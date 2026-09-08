@@ -1,209 +1,171 @@
-import { useRef, useEffect, useState } from "react";
-import { io } from "socket.io-client"
+import { useEffect, useRef, useState } from 'react'
+import { io } from 'socket.io-client'
+import { API_BASE_URL, fetchSongs } from './api.js'
+import MusicPlayer from './components/MusicPlayer.jsx'
+import SongLibrary from './components/SongLibrary.jsx'
+import UploadSong from './components/UploadSong.jsx'
+
+const SOCKET_URL = (
+    import.meta.env.VITE_SOCKET_SERVER_URL || API_BASE_URL
+).replace(/\/$/, '')
+
 export default function App() {
-    const socketRef = useRef(null);
-    const [songs, setSongs] = useState([]);
-    const [currentSong, setCurrentSong] = useState("");
-    const [searchTerm, setSearchTerm] = useState("");
+    const [songs, setSongs] = useState([])
+    const [currentSong, setCurrentSong] = useState(null)
+    const [searchQuery, setSearchQuery] = useState('')
+    const [loadingSongs, setLoadingSongs] = useState(true)
+    const [songsError, setSongsError] = useState('')
+    const [socketConnected, setSocketConnected] = useState(false)
+    const [remotePlaybackCommand, setRemotePlaybackCommand] = useState(null)
+    const songsRef = useRef([])
+    const socketRef = useRef(null)
+    const currentSongRef = useRef(null)
 
-    const [progress, setProgress] = useState(0);
-    const [isPlaying, setIsPlaying] = useState(false);
-
-    const isSeekingRef = useRef(false);
-    const audioRef = useRef(null);
-
-    const [loading, setLoading] = useState(false);
-
-    const [songName, setSongName] = useState("");
-    const [artistName, setArtistName] = useState("");
+    songsRef.current = songs
+    currentSongRef.current = currentSong
 
     useEffect(() => {
-        if (currentSong === "") return
-        console.log("current song ", currentSong)
-        socketRef.current.emit("change_current_song", currentSong)
-    }, [currentSong])
+        let cancelled = false
 
-    useEffect(() => {
-        socketRef.current = io("https://musicsync-si4a.onrender.com/")
-        socketRef.current.on("connect", () => {
-            console.log("socket connected")
-        })
+        async function loadSongs() {
+            setLoadingSongs(true)
+            setSongsError('')
 
-        socketRef.current.on("update_current_song", (data) => {
-            setCurrentSong(data)
-        })
+            try {
+                const loadedSongs = await fetchSongs()
+                if (!cancelled) setSongs(loadedSongs)
+            } catch (error) {
+                console.error('Failed to load songs:', error)
+                if (!cancelled) setSongsError(error instanceof Error ? error.message : 'Failed to load songs.')
+            } finally {
+                if (!cancelled) setLoadingSongs(false)
+            }
+        }
 
-        socketRef.current.on("pause_song", () => {
-            audioRef.current.pause();
-            setIsPlaying(false);
-        })
+        loadSongs()
 
-        socketRef.current.on("play_song", () => {
-            audioRef.current.play();
-            setIsPlaying(true);
-        })
         return () => {
-            socketRef.current.disconnect()
+            cancelled = true
         }
     }, [])
 
-    const fetchSongs = async () => {
-        const res = await fetch("http://localhost:5000/songs");
-        const data = await res.json();
-        setSongs(data);
-    };
-
     useEffect(() => {
-        fetchSongs();
-    }, []);
+        const socket = io(SOCKET_URL)
+        socketRef.current = socket
 
-    useEffect(() => {
-        const audio = audioRef.current;
-        if (!audio) return;
+        socket.on('connect', () => setSocketConnected(true))
+        socket.on('disconnect', () => setSocketConnected(false))
+        socket.on('connect_error', (error) => {
+            console.error('Socket connection failed:', error.message)
+            setSocketConnected(false)
+        })
 
-        const update = () => {
-            if (isSeekingRef.current) return;
-            setProgress((audio.currentTime / audio.duration) * 100 || 0);
-        };
+        socket.on('update_current_song', (payload) => {
+            const songId = typeof payload === 'string'
+                ? payload
+                : payload?.songId || payload?._id
+            const remoteSong = songsRef.current.find((song) => song._id === songId)
 
-        audio.addEventListener("timeupdate", update);
-        return () => audio.removeEventListener("timeupdate", update);
-    }, [currentSong]);
+            if (remoteSong) setCurrentSong(remoteSong)
+        })
 
-    useEffect(() => {
-        const audio = audioRef.current;
-        if (!audio) return;
+        function handleRemotePlayback(type, payload) {
+            const songId = typeof payload === 'string'
+                ? payload
+                : payload?.songId || currentSongRef.current?._id
 
-        if (currentSong) {
-            audio.play();
-            setIsPlaying(true);
-            setProgress(0);
+            setRemotePlaybackCommand({
+                type,
+                songId,
+                position: typeof payload === 'object' ? payload?.position : undefined
+            })
         }
-    }, [currentSong]);
+
+        socket.on('play_song', (payload) => handleRemotePlayback('play', payload))
+        socket.on('pause_song', (payload) => handleRemotePlayback('pause', payload))
+        socket.on('seek_song', (payload) => handleRemotePlayback('seek', payload))
+
+        return () => {
+            socket.disconnect()
+            socketRef.current = null
+        }
+    }, [])
+
+    function selectSong(song, announce = true) {
+        setCurrentSong(song)
+
+        if (announce && socketRef.current?.connected) {
+            socketRef.current.emit('change_current_song', song._id)
+        }
+    }
+
+    function handleSongUploaded(song) {
+        setSongs((previousSongs) => [song, ...previousSongs.filter((item) => item._id !== song._id)])
+        selectSong(song)
+    }
+
+    function emitPlaybackEvent(event, position) {
+        if (!socketRef.current?.connected || !currentSong?._id) return
+
+        socketRef.current.emit(event, {
+            songId: currentSong._id,
+            position
+        })
+    }
+
+    const normalizedQuery = searchQuery.trim().toLowerCase()
+    const filteredSongs = songs.filter((song) => {
+        if (!normalizedQuery) return true
+
+        return [song.title, song.artist, song.album]
+            .filter(Boolean)
+            .some((value) => value.toLowerCase().includes(normalizedQuery))
+    })
 
     return (
-        <div className="m-2 flex flex-col gap-4">
-
-            <div className="flex gap-4">
-                <input
-                    type="text"
-                    value={songName}
-                    onChange={(e) => setSongName(e.target.value)}
-                    placeholder="Song"
-                    className="border-2 border-black rounded-lg w-[8rem] p-2"
-                />
-                <input
-                    type="text"
-                    value={artistName}
-                    onChange={(e) => setArtistName(e.target.value)}
-                    placeholder="Artist"
-                    className="border-2 border-black rounded-lg w-[8rem] p-2"
-                />
-            </div>
-
-            <button
-                className="bg-gray-300 rounded-lg cursor-pointer p-2 w-max"
-                onClick={async () => {
-                    if (songName.trim() && artistName.trim()) setLoading(true);
-
-                    await fetch("http://localhost:8001/api/download", {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/json",
-                        },
-                        body: JSON.stringify({
-                            song: songName,
-                            artist: artistName,
-                        }),
-                    });
-
-                    await fetchSongs();
-                    setLoading(false);
-                }}
-            >
-                Get Song
-            </button>
-
-            <input
-                type="text"
-                placeholder="search in library"
-                className="border-2 border-black rounded-lg w-[15rem] p-2"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-            />
-
-            {loading && <div>Loading...</div>}
-
-            <div className="h-[25rem] border-2 border-black rounded-lg overflow-scroll p-2 flex flex-col gap-4">
-                {songs
-                    .filter((song) =>
-                        song.toLowerCase().includes(searchTerm.toLowerCase())
-                    )
-                    .map((song, id) => (
-                        <div
-                            key={id}
-                            className="cursor-pointer bg-gray-300 p-2 rounded-lg text-xl w-max"
-                            onClick={() => setCurrentSong(song)}
-                        >
-                            {song}
-                        </div>
-                    ))}
-            </div>
-
-            {currentSong && (
-                <div className="flex gap-4 items-center">
-
-                    <audio
-                        ref={audioRef}
-                        src={`http://localhost:5000/music/${currentSong}`}
-                    />
-
-                    <button
-                        className="bg-gray-300 rounded-lg p-2"
-                        onClick={() => {
-                            if (!audioRef.current) return;
-                            socketRef.current.emit("play")
-                            audioRef.current.play();
-                            setIsPlaying(true);
-                        }}
-                    >
-                        Play
-                    </button>
-
-                    <button
-                        className="bg-gray-300 rounded-lg p-2"
-                        onClick={() => {
-                            if (!audioRef.current) return;
-                            socketRef.current.emit("pause")
-                            audioRef.current.pause();
-                            setIsPlaying(false);
-                        }}
-                    >
-                        Pause
-                    </button>
-
-                    <input
-                        type="range"
-                        value={progress}
-                        onMouseDown={() => {
-                            isSeekingRef.current = true;
-                        }}
-                        onMouseUp={(e) => {
-                            const audio = audioRef.current;
-                            if (!audio) return;
-
-                            const value = Number(e.target.value);
-                            audio.currentTime =
-                                (value / 100) * audio.duration;
-
-                            isSeekingRef.current = false;
-                        }}
-                        onChange={(e) => {
-                            setProgress(Number(e.target.value));
-                        }}
-                    />
+        <main className="app-shell">
+            <header className="app-header">
+                <div className="brand-lockup">
+                    <span className="brand-mark" aria-hidden="true">◒</span>
+                    <div>
+                        <p className="brand-name">MusicSync</p>
+                        <p className="brand-tagline">A shared room for every song</p>
+                    </div>
                 </div>
-            )}
-        </div>
-    );
+                <div className="connection-pill">
+                    <span className={`status-dot${socketConnected ? ' online' : ''}`} />
+                    {socketConnected ? 'Connected' : 'Connecting'}
+                </div>
+            </header>
+
+            <section className="intro-block">
+                <p className="eyebrow">The listening room</p>
+                <h1>Bring the room<br /><span>into rhythm.</span></h1>
+                <p className="intro-copy">Build the shared queue now. Real-time playback will plug into the same song identity when streaming is ready.</p>
+            </section>
+
+            <div className="content-grid">
+                <SongLibrary
+                    songs={filteredSongs}
+                    selectedSongId={currentSong?._id}
+                    searchQuery={searchQuery}
+                    onSearchChange={setSearchQuery}
+                    onSelectSong={selectSong}
+                    loading={loadingSongs}
+                    error={songsError}
+                />
+                <UploadSong onSongUploaded={handleSongUploaded} />
+            </div>
+
+            <MusicPlayer
+                key={currentSong?._id || 'empty-player'}
+                song={currentSong}
+                socketConnected={socketConnected}
+                remotePlaybackCommand={remotePlaybackCommand}
+                onLocalPlay={(position) => emitPlaybackEvent('play', position)}
+                onLocalPause={(position) => emitPlaybackEvent('pause', position)}
+                onLocalSeek={(position) => emitPlaybackEvent('seek', position)}
+            />
+        </main>
+    )
 }
