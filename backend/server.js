@@ -27,12 +27,16 @@ const upload = multer({
     }
 })
 
-app.use(cors())
+const frontendOrigins = process.env.FRONTEND_ORIGINS
+    ? process.env.FRONTEND_ORIGINS.split(',').map((origin) => origin.trim()).filter(Boolean)
+    : '*'
+
+app.use(cors({ origin: frontendOrigins }))
 const server = http.createServer(app)
 
 const io = new Server(server, {
     cors: {
-        origin: "*",
+        origin: frontendOrigins,
         methods: ["GET", "POST"]
     }
 })
@@ -286,43 +290,55 @@ function broadcastPlaybackState() {
 }
 
 io.on('connection', (socket) => {
-    console.log('User connected: ' + socket.id)
+    console.log('[SOCKET] Client connected:', socket.id)
     socket.emit('playback_state', { ...playbackState })
+
+    socket.on('disconnect', (reason) => {
+        console.log('[SOCKET] Client disconnected:', socket.id, reason)
+    })
 
     socket.on('change_current_song', (data) => {
         const songId = typeof data === 'string' ? data : data?.songId || data?._id
         if (!songId) return
 
+        console.log('[SOCKET] Received song change:', songId, 'from', socket.id)
         playbackState.currentSongId = songId
         playbackState.isPlaying = false
         playbackState.position = 0
         playbackState.updatedAt = Date.now()
+        console.log('[SOCKET] Broadcasting song change:', songId)
         broadcastPlaybackState()
     })
 
     socket.on('pause', (data) => {
+        console.log('[SOCKET] Received pause:', data, 'from', socket.id)
         const position = Number.isFinite(Number(data?.position)) ? Number(data.position) : playbackState.position
         if (data?.songId) playbackState.currentSongId = data.songId
         playbackState.isPlaying = false
         playbackState.position = position
         playbackState.updatedAt = Date.now()
+        console.log('[SOCKET] Broadcasting pause:', position)
         broadcastPlaybackState()
     })
 
     socket.on('play', (data) => {
+        console.log('[SOCKET] Received play:', data, 'from', socket.id)
         const position = Number.isFinite(Number(data?.position)) ? Number(data.position) : playbackState.position
         if (data?.songId) playbackState.currentSongId = data.songId
         playbackState.isPlaying = true
         playbackState.position = position
         playbackState.updatedAt = Date.now()
+        console.log('[SOCKET] Broadcasting play:', position)
         broadcastPlaybackState()
     })
 
     socket.on('seek', (data) => {
+        console.log('[SOCKET] Received seek:', data, 'from', socket.id)
         const position = Number.isFinite(Number(data?.position)) ? Number(data.position) : playbackState.position
         if (data?.songId) playbackState.currentSongId = data.songId
         playbackState.position = position
         playbackState.updatedAt = Date.now()
+        console.log('[SOCKET] Broadcasting seek:', position)
         broadcastPlaybackState()
     })
 })

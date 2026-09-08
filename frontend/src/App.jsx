@@ -1,13 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
-import { API_BASE_URL, fetchSongs } from './api.js'
+import { fetchSongs, SOCKET_URL } from './api.js'
 import MusicPlayer from './components/MusicPlayer.jsx'
 import SongLibrary from './components/SongLibrary.jsx'
 import UploadSong from './components/UploadSong.jsx'
-
-const SOCKET_URL = (
-    import.meta.env.VITE_SOCKET_SERVER_URL || API_BASE_URL
-).replace(/\/$/, '')
 
 export default function App() {
     const [songs, setSongs] = useState([])
@@ -65,11 +61,20 @@ export default function App() {
         const socket = io(SOCKET_URL)
         socketRef.current = socket
 
+        socket.on('connect', () => {
+            console.log('[SOCKET] Connected:', socket.id)
+        })
+
+        socket.on('disconnect', (reason) => {
+            console.log('[SOCKET] Disconnected:', reason)
+        })
+
         socket.on('connect_error', (error) => {
-            console.error('Socket connection failed:', error.message)
+            console.error('[SOCKET] Connection error:', error.message)
         })
 
         socket.on('playback_state', (state) => {
+            console.log('[SOCKET] Received playback state:', state)
             const remoteSong = songsRef.current.find((song) => song._id === state?.currentSongId)
             if (!remoteSong) {
                 pendingPlaybackStateRef.current = state
@@ -94,6 +99,7 @@ export default function App() {
         setCurrentSong(song)
 
         if (announce && socketRef.current?.connected) {
+            console.log('[SOCKET] Emitting song change:', song._id)
             socketRef.current.emit('change_current_song', song._id)
         }
     }
@@ -106,11 +112,13 @@ export default function App() {
     function emitPlaybackEvent(event, position) {
         if (!socketRef.current?.connected || !currentSong?._id) return
 
-        socketRef.current.emit(event, {
+        const payload = {
             songId: currentSong._id,
             position,
             timestamp: Date.now()
-        })
+        }
+        console.log(`[SOCKET] Emitting ${event}:`, payload)
+        socketRef.current.emit(event, payload)
     }
 
     const normalizedQuery = searchQuery.trim().toLowerCase()

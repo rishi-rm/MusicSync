@@ -4,6 +4,13 @@ const API_BASE_URL = (
     'https://musicsync-1-p4h4.onrender.com'
 ).replace(/\/$/, '')
 
+const SOCKET_URL = (
+    import.meta.env.VITE_SOCKET_SERVER_URL || API_BASE_URL
+).replace(/\/$/, '')
+
+console.log('[CONFIG] API URL:', API_BASE_URL)
+console.log('[CONFIG] Socket URL:', SOCKET_URL)
+
 async function parseResponse(response, fallbackMessage) {
     const data = await response.json().catch(() => ({}))
 
@@ -41,4 +48,4 @@ export async function uploadSong({ file, artist, album }) {
     return data.song
 }
 
-export { API_BASE_URL }
+export { API_BASE_URL, SOCKET_URL }
