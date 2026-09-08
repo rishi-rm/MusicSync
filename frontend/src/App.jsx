@@ -136,7 +136,7 @@ export default function App() {
                 <div className="brand-lockup">
                     <span className="brand-mark" aria-hidden="true">◒</span>
                     <div>
-                        <p className="brand-name">MusicSync</p>
+                        <p className="brand-name">Harmo</p>
                         <p className="brand-tagline">A shared room for every song</p>
                     </div>
                 </div>

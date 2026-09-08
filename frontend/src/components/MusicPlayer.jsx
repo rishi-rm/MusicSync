@@ -149,6 +149,24 @@ export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, 
         onLocalSeek?.(audio.currentTime)
     }
 
+    function handleRestart() {
+        const audio = audioRef.current
+        if (!audio) return
+
+        audio.currentTime = 0
+        setCurrentTime(0)
+        onLocalSeek?.(0)
+    }
+
+    function handleEnd() {
+        const audio = audioRef.current
+        if (!audio || !duration) return
+
+        audio.currentTime = duration
+        setCurrentTime(duration)
+        onLocalSeek?.(duration)
+    }
+
     const hasSong = Boolean(song?._id)
 
     return (
@@ -182,11 +200,11 @@ export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, 
                 <span>{formatTime(duration)}</span>
             </div>
             <div className="player-controls" aria-label="Playback controls">
-                <button type="button" onClick={() => { audioRef.current.currentTime = 0 }} disabled={!hasSong} aria-label="Restart song">↺</button>
+                <button type="button" onClick={handleRestart} disabled={!hasSong} aria-label="Restart song">↺</button>
                 <button className="play-button" type="button" onClick={isPlaying ? handlePause : handlePlay} disabled={!hasSong} aria-label={isPlaying ? 'Pause song' : 'Play song'}>
                     {isPlaying ? 'Ⅱ' : '▶'}
                 </button>
-                <button type="button" onClick={() => { audioRef.current.currentTime = duration }} disabled={!hasSong || !duration} aria-label="End song">↻</button>
+                <button type="button" onClick={handleEnd} disabled={!hasSong || !duration} aria-label="End song">↻</button>
             </div>
             {playbackError && <p className="player-note error-message">{playbackError}</p>}
         </section>
