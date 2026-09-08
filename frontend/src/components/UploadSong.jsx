@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { uploadSong } from '../api.js'
 
 const MAX_FILE_SIZE_MB = Number(import.meta.env.VITE_MAX_FILE_SIZE_MB || 20)
@@ -9,6 +9,8 @@ function titleFromFileName(fileName) {
 }
 
 export default function UploadSong({ onSongUploaded }) {
+    const formRef = useRef(null)
+    const fileInputRef = useRef(null)
     const [selectedFile, setSelectedFile] = useState(null)
     const [artist, setArtist] = useState('')
     const [album, setAlbum] = useState('')
@@ -65,7 +67,14 @@ export default function UploadSong({ onSongUploaded }) {
             setSelectedFile(null)
             setArtist('')
             setAlbum('')
-            event.currentTarget.reset()
+
+            if (formRef.current) {
+                formRef.current.reset()
+            }
+
+            if (fileInputRef.current) {
+                fileInputRef.current.value = ''
+            }
         } catch (uploadError) {
             console.error('Song upload failed:', uploadError)
             setError(uploadError instanceof Error ? uploadError.message : 'Failed to upload song.')
@@ -84,9 +93,9 @@ export default function UploadSong({ onSongUploaded }) {
                 <span className="upload-icon" aria-hidden="true">＋</span>
             </div>
 
-            <form className="upload-form" onSubmit={handleSubmit}>
+            <form ref={formRef} className="upload-form" onSubmit={handleSubmit}>
                 <label className="file-dropzone">
-                    <input type="file" accept="audio/mpeg,audio/mp3,.mp3" onChange={handleFileChange} />
+                    <input ref={fileInputRef} type="file" accept="audio/mpeg,audio/mp3,.mp3" onChange={handleFileChange} />
                     <span className="file-mark" aria-hidden="true">♫</span>
                     <strong>{selectedFile ? selectedFile.name : 'Choose an MP3 file'}</strong>
                     <span>Up to {MAX_FILE_SIZE_MB} MB</span>

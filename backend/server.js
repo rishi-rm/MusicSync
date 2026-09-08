@@ -274,21 +274,59 @@ app.post('/upload', upload.single('song'), async (req, res, next) => {
     }
 })
 
+const playbackState = {
+    currentSongId: null,
+    isPlaying: false,
+    position: 0,
+    updatedAt: Date.now()
+}
+
 io.on('connection', (socket) => {
     console.log('User connected: ' + socket.id)
+    socket.emit('playback_state', playbackState)
 
     socket.on('change_current_song', (data) => {
-        socket.broadcast.emit('update_current_song', data)
+        const songId = typeof data === 'string' ? data : data?.songId || data?._id
+        if (!songId) return
+
+        playbackState.currentSongId = songId
+        playbackState.updatedAt = Date.now()
+        io.emit('update_current_song', { songId })
     })
 
     socket.on('pause', (data) => {
-        socket.broadcast.emit('pause_song', data)
+        const position = Number.isFinite(Number(data?.position)) ? Number(data.position) : playbackState.position
+        playbackState.isPlaying = false
+        playbackState.position = position
+        playbackState.updatedAt = Date.now()
+        io.emit('pause_song', {
+            songId: data?.songId || playbackState.currentSongId,
+            position,
+            timestamp: playbackState.updatedAt
+        })
     })
+
     socket.on('play', (data) => {
-        socket.broadcast.emit('play_song', data)
+        const position = Number.isFinite(Number(data?.position)) ? Number(data.position) : playbackState.position
+        playbackState.isPlaying = true
+        playbackState.position = position
+        playbackState.updatedAt = Date.now()
+        io.emit('play_song', {
+            songId: data?.songId || playbackState.currentSongId,
+            position,
+            timestamp: playbackState.updatedAt
+        })
     })
+
     socket.on('seek', (data) => {
-        socket.broadcast.emit('seek_song', data)
+        const position = Number.isFinite(Number(data?.position)) ? Number(data.position) : playbackState.position
+        playbackState.position = position
+        playbackState.updatedAt = Date.now()
+        io.emit('seek_song', {
+            songId: data?.songId || playbackState.currentSongId,
+            position,
+            timestamp: playbackState.updatedAt
+        })
     })
 })
 

@@ -109,7 +109,8 @@ export default function App() {
 
         socketRef.current.emit(event, {
             songId: currentSong._id,
-            position
+            position,
+            timestamp: Date.now()
         })
     }
 
@@ -132,17 +133,17 @@ export default function App() {
                         <p className="brand-tagline">A shared room for every song</p>
                     </div>
                 </div>
-                <div className="connection-pill">
+                {/* <div className="connection-pill">
                     <span className={`status-dot${socketConnected ? ' online' : ''}`} />
                     {socketConnected ? 'Connected' : 'Connecting'}
-                </div>
+                </div> */}
             </header>
 
-            <section className="intro-block">
+            {/* <section className="intro-block">
                 <p className="eyebrow">The listening room</p>
                 <h1>Bring the room<br /><span>into rhythm.</span></h1>
                 <p className="intro-copy">Build the shared queue now. Real-time playback will plug into the same song identity when streaming is ready.</p>
-            </section>
+            </section> */}
 
             <div className="content-grid">
                 <SongLibrary
