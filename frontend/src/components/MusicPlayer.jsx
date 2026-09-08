@@ -12,16 +12,30 @@ function formatTime(seconds) {
 export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, onLocalPause, onLocalSeek }) {
     const audioRef = useRef(null)
     const pendingRemotePlayRef = useRef(false)
+    const suppressPlayEventRef = useRef(false)
+    const suppressPauseEventRef = useRef(false)
+    const suppressSeekEventRef = useRef(false)
+    const onLocalPlayRef = useRef(onLocalPlay)
+    const onLocalPauseRef = useRef(onLocalPause)
+    const onLocalSeekRef = useRef(onLocalSeek)
     const [isPlaying, setIsPlaying] = useState(false)
     const [currentTime, setCurrentTime] = useState(0)
     const [duration, setDuration] = useState(0)
     const [playbackError, setPlaybackError] = useState('')
 
     useEffect(() => {
+        onLocalPlayRef.current = onLocalPlay
+        onLocalPauseRef.current = onLocalPause
+        onLocalSeekRef.current = onLocalSeek
+    }, [onLocalPause, onLocalPlay, onLocalSeek])
+
+    useEffect(() => {
         const audio = audioRef.current
         if (!audio) return undefined
 
+        suppressPauseEventRef.current = !audio.paused
         audio.pause()
+        suppressSeekEventRef.current = true
         audio.currentTime = 0
 
         if (song?._id) {
@@ -37,14 +51,40 @@ export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, 
             if (!pendingRemotePlayRef.current || !song?._id) return
 
             pendingRemotePlayRef.current = false
+            suppressPlayEventRef.current = true
             void audio.play().catch((error) => {
+                suppressPlayEventRef.current = false
                 console.error('Remote audio playback could not start once ready:', error)
                 setPlaybackError('Remote playback could not start on this device.')
             })
         }
         const handleTimeUpdate = () => setCurrentTime(audio.currentTime)
-        const handlePlay = () => setIsPlaying(true)
-        const handlePause = () => setIsPlaying(false)
+        const handlePlay = () => {
+            setIsPlaying(true)
+            if (suppressPlayEventRef.current) {
+                suppressPlayEventRef.current = false
+                return
+            }
+
+            onLocalPlayRef.current?.(audio.currentTime, song._id)
+        }
+        const handlePause = () => {
+            setIsPlaying(false)
+            if (suppressPauseEventRef.current) {
+                suppressPauseEventRef.current = false
+                return
+            }
+
+            onLocalPauseRef.current?.(audio.currentTime, song._id)
+        }
+        const handleSeeked = () => {
+            if (suppressSeekEventRef.current) {
+                suppressSeekEventRef.current = false
+                return
+            }
+
+            onLocalSeekRef.current?.(audio.currentTime, song._id)
+        }
         const handleEnded = () => {
             setIsPlaying(false)
             setCurrentTime(0)
@@ -59,6 +99,7 @@ export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, 
         audio.addEventListener('timeupdate', handleTimeUpdate)
         audio.addEventListener('play', handlePlay)
         audio.addEventListener('pause', handlePause)
+        audio.addEventListener('seeked', handleSeeked)
         audio.addEventListener('ended', handleEnded)
         audio.addEventListener('error', handleError)
 
@@ -69,6 +110,7 @@ export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, 
             audio.removeEventListener('timeupdate', handleTimeUpdate)
             audio.removeEventListener('play', handlePlay)
             audio.removeEventListener('pause', handlePause)
+            audio.removeEventListener('seeked', handleSeeked)
             audio.removeEventListener('ended', handleEnded)
             audio.removeEventListener('error', handleError)
         }
@@ -81,6 +123,7 @@ export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, 
 
         const position = Number(remotePlaybackCommand.position)
         if (Number.isFinite(position)) {
+            suppressSeekEventRef.current = true
             audio.currentTime = position
         }
 
@@ -88,7 +131,9 @@ export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, 
             pendingRemotePlayRef.current = true
             if (audio.readyState >= 2) {
                 pendingRemotePlayRef.current = false
+                suppressPlayEventRef.current = true
                 void audio.play().catch((error) => {
+                    suppressPlayEventRef.current = false
                     console.error('Remote audio playback could not start:', error)
                     setPlaybackError('Remote playback could not start on this device.')
                 })
@@ -98,6 +143,7 @@ export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, 
 
         if (remotePlaybackCommand.type === 'pause') {
             pendingRemotePlayRef.current = false
+            suppressPauseEventRef.current = !audio.paused
             audio.pause()
             return
         }
@@ -111,12 +157,10 @@ export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, 
         const audio = audioRef.current
         if (!audio || !song) return
 
-        pendingRemotePlayRef.current = false
         setPlaybackError('')
 
         try {
             await audio.play()
-            onLocalPlay?.(audio.currentTime)
         } catch (error) {
             console.error('Audio playback could not start:', error)
             setPlaybackError('Playback was blocked or the audio could not be loaded.')
@@ -128,9 +172,7 @@ export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, 
         const audio = audioRef.current
         if (!audio) return
 
-        pendingRemotePlayRef.current = false
         audio.pause()
-        onLocalPause?.(audio.currentTime)
     }
 
     function handleSeek(event) {
@@ -146,7 +188,6 @@ export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, 
         const audio = audioRef.current
         if (!audio) return
 
-        onLocalSeek?.(audio.currentTime)
     }
 
     function handleRestart() {
@@ -155,7 +196,6 @@ export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, 
 
         audio.currentTime = 0
         setCurrentTime(0)
-        onLocalSeek?.(0)
     }
 
     function handleEnd() {
@@ -164,7 +204,6 @@ export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, 
 
         audio.currentTime = duration
         setCurrentTime(duration)
-        onLocalSeek?.(duration)
     }
 
     const hasSong = Boolean(song?._id)

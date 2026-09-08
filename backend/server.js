@@ -331,10 +331,12 @@ io.on('connection', (socket) => {
         const songId = typeof data === 'string' ? data : data?.songId || data?._id
         if (!songId) return
 
-        console.log('[SOCKET] Received song change:', songId, 'from', socket.id)
+        const shouldPlay = typeof data === 'string' ? false : data?.shouldPlay !== false
+        const position = Number.isFinite(Number(data?.position)) ? Number(data.position) : 0
+        console.log('[SOCKET] Received song change:', songId, { shouldPlay, position }, 'from', socket.id)
         playbackState.currentSongId = songId
-        playbackState.isPlaying = false
-        playbackState.position = 0
+        playbackState.isPlaying = shouldPlay
+        playbackState.position = position
         playbackState.updatedAt = Date.now()
         console.log('[SOCKET] Broadcasting song change:', songId)
         broadcastPlaybackState()

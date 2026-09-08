@@ -20,6 +20,16 @@ export default function App() {
 
     songsRef.current = songs
 
+    function getPlaybackPosition(state) {
+        const position = Number(state?.position)
+        if (!Number.isFinite(position)) return 0
+        if (!state?.isPlaying) return position
+
+        const updatedAt = Number(state.updatedAt)
+        const elapsed = Number.isFinite(updatedAt) ? Math.max(0, (Date.now() - updatedAt) / 1000) : 0
+        return position + elapsed
+    }
+
     useEffect(() => {
         let cancelled = false
 
@@ -40,7 +50,7 @@ export default function App() {
                         setRemotePlaybackCommand({
                             type: pendingState.isPlaying ? 'play' : 'pause',
                             songId: pendingState.currentSongId,
-                            position: pendingState.position
+                            position: getPlaybackPosition(pendingState)
                         })
                     }
                 }
@@ -87,7 +97,7 @@ export default function App() {
             setRemotePlaybackCommand({
                 type: state.isPlaying ? 'play' : 'pause',
                 songId: state.currentSongId,
-                position: state.position
+                position: getPlaybackPosition(state)
             })
         })
 
@@ -99,10 +109,16 @@ export default function App() {
 
     function selectSong(song, announce = true) {
         setCurrentSong(song)
+        setRemotePlaybackCommand({
+            type: 'play',
+            songId: song._id,
+            position: 0
+        })
 
         if (announce && socketRef.current?.connected) {
-            console.log('[SOCKET] Emitting song change:', song._id)
-            socketRef.current.emit('change_current_song', song._id)
+            const payload = { songId: song._id, shouldPlay: true, position: 0 }
+            console.log('[SOCKET] Emitting song change:', payload)
+            socketRef.current.emit('change_current_song', payload)
         }
     }
 
@@ -139,11 +155,11 @@ export default function App() {
         }
     }
 
-    function emitPlaybackEvent(event, position) {
-        if (!socketRef.current?.connected || !currentSong?._id) return
+    function emitPlaybackEvent(event, songId, position) {
+        if (!socketRef.current?.connected || !songId) return
 
         const payload = {
-            songId: currentSong._id,
+            songId,
             position,
             timestamp: Date.now()
         }
@@ -210,9 +226,9 @@ export default function App() {
                 key={currentSong?._id || 'empty-player'}
                 song={currentSong}
                 remotePlaybackCommand={remotePlaybackCommand}
-                onLocalPlay={(position) => emitPlaybackEvent('play', position)}
-                onLocalPause={(position) => emitPlaybackEvent('pause', position)}
-                onLocalSeek={(position) => emitPlaybackEvent('seek', position)}
+                onLocalPlay={(position, songId) => emitPlaybackEvent('play', songId, position)}
+                onLocalPause={(position, songId) => emitPlaybackEvent('pause', songId, position)}
+                onLocalSeek={(position, songId) => emitPlaybackEvent('seek', songId, position)}
             />
         </main>
     )
