@@ -46,7 +46,8 @@ h2 { margin-top: 5px; color: #fff7ed; font-size: 1.7rem; font-weight: 400; }
 .search-field { gap: 9px; border-bottom: 1px solid rgba(245, 240, 232, 0.2); margin-bottom: 15px; padding: 8px 2px 11px; color: #e59a5c; }
 .search-field input, .form-field input { width: 100%; border: 0; outline: 0; background: transparent; color: #fff7ed; }
 .search-field input::placeholder, .form-field input::placeholder { color: #7f9187; }
-.song-list { display: grid; max-height: clamp(300px, 48vh, 540px); gap: 5px; overflow-y: auto; padding-right: 4px; overscroll-behavior: contain; }
+.song-list { display: grid; max-height: clamp(300px, 48vh, 540px); gap: 5px; overflow-y: auto; padding-right: 4px; overscroll-behavior: contain; scrollbar-width: none; }
+.song-list::-webkit-scrollbar { display: none; }
 .song-row { width: 100%; gap: 13px; border: 1px solid transparent; border-radius: 2px; padding: 13px 10px; background: transparent; cursor: pointer; text-align: left; transition: background 160ms ease, border-color 160ms ease; }
 .song-row { position: relative; }
 .song-row:hover, .song-row.selected { border-color: rgba(229, 154, 92, 0.25); background: rgba(229, 154, 92, 0.09); }
