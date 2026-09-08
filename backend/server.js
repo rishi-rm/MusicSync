@@ -216,62 +216,64 @@ app.get('/songs/:id/stream', async (req, res) => {
     object.Body.pipe(res)
 })
 
-app.post('/upload', upload.single('song'), async (req, res, next) => {
-    if (!req.file) {
-        return res.status(400).json({ success: false, message: 'No song file was uploaded.' })
+app.post('/upload', upload.array('song', 50), async (req, res, next) => {
+    if (!req.files?.length) {
+        return res.status(400).json({ success: false, message: 'No song files were uploaded.' })
     }
 
-    if (req.file.mimetype !== 'audio/mpeg') {
+    if (req.files.some((file) => file.mimetype !== 'audio/mpeg')) {
         return res.status(400).json({ success: false, message: 'Only MP3 files are allowed.' })
     }
 
-    const title = req.file.originalname.trim().replace(/\.mp3$/i, '').trim()
     const artist = typeof req.body.artist === 'string' ? req.body.artist.trim() : ''
     const album = typeof req.body.album === 'string' ? req.body.album.trim() : ''
+    const files = req.files.map((file) => ({
+        file,
+        title: file.originalname.trim().replace(/\.mp3$/i, '').trim(),
+        r2Key: `songs/${crypto.randomUUID()}.mp3`
+    }))
 
-    if (!title) {
+    if (files.some(({ title }) => !title)) {
         return res.status(400).json({ success: false, message: 'Song title is required.' })
     }
 
-    const r2Key = `songs/${crypto.randomUUID()}.mp3`
-
     try {
-        const command = new PutObjectCommand({
+        await Promise.all(files.map(({ file, r2Key }) => r2Client.send(new PutObjectCommand({
             Bucket: process.env.R2_BUCKET_NAME,
             Key: r2Key,
-            Body: req.file.buffer,
+            Body: file.buffer,
             ContentType: 'audio/mpeg'
-        })
-        await r2Client.send(command)
+        }))))
     } catch (error) {
         console.error('R2 upload failed:', error.message)
+        await Promise.all(files.map(({ r2Key }) => r2Client.send(new DeleteObjectCommand({
+            Bucket: process.env.R2_BUCKET_NAME,
+            Key: r2Key
+        })).catch((cleanupError) => console.error('R2 cleanup failed:', cleanupError.message))))
         return res.status(502).json({ success: false, message: 'Failed to upload the song to storage.' })
     }
 
     try {
-        const song = await Song.create({
+        const songs = await Song.create(files.map(({ file, title, r2Key }) => ({
             title,
             artist: artist || undefined,
             album: album || null,
             r2Key,
-            originalFileName: req.file.originalname,
-            fileSize: req.file.size
-        })
+            originalFileName: file.originalname,
+            fileSize: file.size
+        })))
 
         return res.status(201).json({
             success: true,
-            message: 'Song uploaded successfully',
-            song
+            message: 'Songs uploaded successfully',
+            songs,
+            song: songs[0]
         })
     } catch (error) {
-        try {
-            await r2Client.send(new DeleteObjectCommand({
+        await Promise.all(files.map(({ r2Key }) => r2Client.send(new DeleteObjectCommand({
                 Bucket: process.env.R2_BUCKET_NAME,
                 Key: r2Key
-            }))
-        } catch (cleanupError) {
-            console.error('R2 cleanup failed:', cleanupError.message)
-        }
+            })).catch((cleanupError) => console.error('R2 cleanup failed:', cleanupError.message))))
 
         console.error('Failed to save song metadata:', error.message)
         return res.status(500).json({ success: false, message: 'Failed to save song metadata.' })
