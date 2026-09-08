@@ -15,14 +15,12 @@ export default function App() {
     const [searchQuery, setSearchQuery] = useState('')
     const [loadingSongs, setLoadingSongs] = useState(true)
     const [songsError, setSongsError] = useState('')
-    const [socketConnected, setSocketConnected] = useState(false)
     const [remotePlaybackCommand, setRemotePlaybackCommand] = useState(null)
     const songsRef = useRef([])
     const socketRef = useRef(null)
-    const currentSongRef = useRef(null)
+    const pendingPlaybackStateRef = useRef(null)
 
     songsRef.current = songs
-    currentSongRef.current = currentSong
 
     useEffect(() => {
         let cancelled = false
@@ -33,7 +31,21 @@ export default function App() {
 
             try {
                 const loadedSongs = await fetchSongs()
-                if (!cancelled) setSongs(loadedSongs)
+                if (!cancelled) {
+                    setSongs(loadedSongs)
+
+                    const pendingState = pendingPlaybackStateRef.current
+                    const pendingSong = loadedSongs.find((song) => song._id === pendingState?.currentSongId)
+                    if (pendingSong) {
+                        pendingPlaybackStateRef.current = null
+                        setCurrentSong(pendingSong)
+                        setRemotePlaybackCommand({
+                            type: pendingState.isPlaying ? 'play' : 'pause',
+                            songId: pendingState.currentSongId,
+                            position: pendingState.position
+                        })
+                    }
+                }
             } catch (error) {
                 console.error('Failed to load songs:', error)
                 if (!cancelled) setSongsError(error instanceof Error ? error.message : 'Failed to load songs.')
@@ -53,37 +65,24 @@ export default function App() {
         const socket = io(SOCKET_URL)
         socketRef.current = socket
 
-        socket.on('connect', () => setSocketConnected(true))
-        socket.on('disconnect', () => setSocketConnected(false))
         socket.on('connect_error', (error) => {
             console.error('Socket connection failed:', error.message)
-            setSocketConnected(false)
         })
 
-        socket.on('update_current_song', (payload) => {
-            const songId = typeof payload === 'string'
-                ? payload
-                : payload?.songId || payload?._id
-            const remoteSong = songsRef.current.find((song) => song._id === songId)
+        socket.on('playback_state', (state) => {
+            const remoteSong = songsRef.current.find((song) => song._id === state?.currentSongId)
+            if (!remoteSong) {
+                pendingPlaybackStateRef.current = state
+                return
+            }
 
-            if (remoteSong) setCurrentSong(remoteSong)
-        })
-
-        function handleRemotePlayback(type, payload) {
-            const songId = typeof payload === 'string'
-                ? payload
-                : payload?.songId || currentSongRef.current?._id
-
+            setCurrentSong(remoteSong)
             setRemotePlaybackCommand({
-                type,
-                songId,
-                position: typeof payload === 'object' ? payload?.position : undefined
+                type: state.isPlaying ? 'play' : 'pause',
+                songId: state.currentSongId,
+                position: state.position
             })
-        }
-
-        socket.on('play_song', (payload) => handleRemotePlayback('play', payload))
-        socket.on('pause_song', (payload) => handleRemotePlayback('pause', payload))
-        socket.on('seek_song', (payload) => handleRemotePlayback('seek', payload))
+        })
 
         return () => {
             socket.disconnect()
@@ -161,7 +160,6 @@ export default function App() {
             <MusicPlayer
                 key={currentSong?._id || 'empty-player'}
                 song={currentSong}
-                socketConnected={socketConnected}
                 remotePlaybackCommand={remotePlaybackCommand}
                 onLocalPlay={(position) => emitPlaybackEvent('play', position)}
                 onLocalPause={(position) => emitPlaybackEvent('pause', position)}

@@ -9,7 +9,7 @@ function formatTime(seconds) {
     return `${minutes}:${remainingSeconds}`
 }
 
-export default function MusicPlayer({ song, socketConnected, remotePlaybackCommand, onLocalPlay, onLocalPause, onLocalSeek }) {
+export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, onLocalPause, onLocalSeek }) {
     const audioRef = useRef(null)
     const pendingRemotePlayRef = useRef(false)
     const [isPlaying, setIsPlaying] = useState(false)
@@ -140,7 +140,13 @@ export default function MusicPlayer({ song, socketConnected, remotePlaybackComma
         const nextTime = Number(event.target.value)
         audio.currentTime = nextTime
         setCurrentTime(nextTime)
-        onLocalSeek?.(nextTime)
+    }
+
+    function handleSeekCommit() {
+        const audio = audioRef.current
+        if (!audio) return
+
+        onLocalSeek?.(audio.currentTime)
     }
 
     const hasSong = Boolean(song?._id)
@@ -168,6 +174,9 @@ export default function MusicPlayer({ song, socketConnected, remotePlaybackComma
                     step="0.1"
                     value={Math.min(currentTime, duration || 0)}
                     onChange={handleSeek}
+                    onMouseUp={handleSeekCommit}
+                    onTouchEnd={handleSeekCommit}
+                    onKeyUp={handleSeekCommit}
                     disabled={!hasSong || !duration}
                 />
                 <span>{formatTime(duration)}</span>

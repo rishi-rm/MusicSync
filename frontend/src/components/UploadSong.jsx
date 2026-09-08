@@ -9,7 +9,6 @@ function titleFromFileName(fileName) {
 }
 
 export default function UploadSong({ onSongUploaded }) {
-    const formRef = useRef(null)
     const fileInputRef = useRef(null)
     const [selectedFile, setSelectedFile] = useState(null)
     const [artist, setArtist] = useState('')
@@ -68,10 +67,6 @@ export default function UploadSong({ onSongUploaded }) {
             setArtist('')
             setAlbum('')
 
-            if (formRef.current) {
-                formRef.current.reset()
-            }
-
             if (fileInputRef.current) {
                 fileInputRef.current.value = ''
             }
@@ -93,7 +88,7 @@ export default function UploadSong({ onSongUploaded }) {
                 <span className="upload-icon" aria-hidden="true">＋</span>
             </div>
 
-            <form ref={formRef} className="upload-form" onSubmit={handleSubmit}>
+            <form className="upload-form" onSubmit={handleSubmit}>
                 <label className="file-dropzone">
                     <input ref={fileInputRef} type="file" accept="audio/mpeg,audio/mp3,.mp3" onChange={handleFileChange} />
                     <span className="file-mark" aria-hidden="true">♫</span>

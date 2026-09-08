@@ -1,7 +1,7 @@
 const API_BASE_URL = (
     import.meta.env.VITE_API_BASE_URL ||
     import.meta.env.VITE_UPLOAD_SERVER_URL ||
-    'http://localhost:3000'
+    'https://musicsync-1-p4h4.onrender.com'
 ).replace(/\/$/, '')
 
 async function parseResponse(response, fallbackMessage) {

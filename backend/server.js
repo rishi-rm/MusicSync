@@ -281,52 +281,49 @@ const playbackState = {
     updatedAt: Date.now()
 }
 
+function broadcastPlaybackState() {
+    io.emit('playback_state', { ...playbackState })
+}
+
 io.on('connection', (socket) => {
     console.log('User connected: ' + socket.id)
-    socket.emit('playback_state', playbackState)
+    socket.emit('playback_state', { ...playbackState })
 
     socket.on('change_current_song', (data) => {
         const songId = typeof data === 'string' ? data : data?.songId || data?._id
         if (!songId) return
 
         playbackState.currentSongId = songId
+        playbackState.isPlaying = false
+        playbackState.position = 0
         playbackState.updatedAt = Date.now()
-        io.emit('update_current_song', { songId })
+        broadcastPlaybackState()
     })
 
     socket.on('pause', (data) => {
         const position = Number.isFinite(Number(data?.position)) ? Number(data.position) : playbackState.position
+        if (data?.songId) playbackState.currentSongId = data.songId
         playbackState.isPlaying = false
         playbackState.position = position
         playbackState.updatedAt = Date.now()
-        io.emit('pause_song', {
-            songId: data?.songId || playbackState.currentSongId,
-            position,
-            timestamp: playbackState.updatedAt
-        })
+        broadcastPlaybackState()
     })
 
     socket.on('play', (data) => {
         const position = Number.isFinite(Number(data?.position)) ? Number(data.position) : playbackState.position
+        if (data?.songId) playbackState.currentSongId = data.songId
         playbackState.isPlaying = true
         playbackState.position = position
         playbackState.updatedAt = Date.now()
-        io.emit('play_song', {
-            songId: data?.songId || playbackState.currentSongId,
-            position,
-            timestamp: playbackState.updatedAt
-        })
+        broadcastPlaybackState()
     })
 
     socket.on('seek', (data) => {
         const position = Number.isFinite(Number(data?.position)) ? Number(data.position) : playbackState.position
+        if (data?.songId) playbackState.currentSongId = data.songId
         playbackState.position = position
         playbackState.updatedAt = Date.now()
-        io.emit('seek_song', {
-            songId: data?.songId || playbackState.currentSongId,
-            position,
-            timestamp: playbackState.updatedAt
-        })
+        broadcastPlaybackState()
     })
 })
 
