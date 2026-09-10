@@ -321,13 +321,13 @@ function broadcastPlaybackState() {
 }
 
 async function selectRandomNextSong(endedSongId) {
-    if (nextSongSelectionInProgress || playbackState.currentSongId !== endedSongId || !playbackState.isPlaying) return
+    if (nextSongSelectionInProgress || playbackState.currentSongId !== endedSongId) return
 
     nextSongSelectionInProgress = true
 
     try {
         const songs = await Song.find({}, { _id: 1 })
-        if (playbackState.currentSongId !== endedSongId || !playbackState.isPlaying || songs.length === 0) return
+        if (playbackState.currentSongId !== endedSongId || songs.length === 0) return
 
         const nextSongs = songs.length > 1
             ? songs.filter((song) => song._id.toString() !== endedSongId)
