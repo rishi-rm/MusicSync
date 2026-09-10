@@ -10,8 +10,13 @@ import { Server } from 'socket.io'
 import { r2Client } from './r2.js'
 import { connectDB } from './db.js'
 import Song from './models/Song.js'
+import authRoutes from './routes/auth.js'
 
 dotenv.config()
+
+if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET is not configured. Set it in the backend environment before starting the server.')
+}
 
 const app = express()
 const upload = multer({
@@ -33,6 +38,7 @@ const frontendOrigins = process.env.FRONTEND_ORIGINS
 
 app.use(cors({ origin: frontendOrigins }))
 app.use(express.json())
+app.use('/auth', authRoutes)
 const server = http.createServer(app)
 
 const io = new Server(server, {

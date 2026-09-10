@@ -133,3 +133,108 @@ h2 { margin-top: 5px; color: #fff7ed; font-size: 1.7rem; font-weight: 400; }
     .player-progress input { min-width: 0; }
     .player-controls { gap: 11px; }
 }
+
+.auth-screen {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+}
+
+.auth-card {
+    width: min(100%, 430px);
+    border: 1px solid rgba(245, 240, 232, 0.16);
+    background: rgba(13, 20, 19, 0.72);
+    box-shadow: 0 24px 55px rgba(0, 0, 0, 0.28);
+    padding: 26px 22px 20px;
+}
+
+.auth-brand {
+    justify-content: center;
+    margin-bottom: 22px;
+}
+
+.auth-toggle {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding: 5px;
+    border: 1px solid rgba(245, 240, 232, 0.12);
+    background: rgba(255, 255, 255, 0.02);
+    margin-bottom: 20px;
+}
+
+.auth-toggle button {
+    border: 0;
+    background: transparent;
+    color: #b5c3bc;
+    font-family: 'Trebuchet MS', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    padding: 12px 10px;
+    cursor: pointer;
+}
+
+.auth-toggle button.active {
+    background: rgba(229, 154, 92, 0.14);
+    color: #fbd6ac;
+}
+
+.auth-form {
+    display: grid;
+    gap: 14px;
+}
+
+.auth-field span {
+    display: block;
+    color: #c7d1cc;
+    margin-bottom: 6px;
+}
+
+.auth-field input {
+    width: 100%;
+    border: 1px solid rgba(245, 240, 232, 0.18);
+    border-radius: 8px;
+    background: rgba(11, 17, 16, 0.65);
+    color: #f8eee2;
+    padding: 12px 14px;
+}
+
+.auth-submit {
+    width: 100%;
+    margin-top: 6px;
+}
+
+.auth-error {
+    padding: 0;
+    margin: 0;
+}
+
+.auth-switch {
+    margin: 18px 0 0;
+    color: #a9b7b1;
+    font-family: 'Trebuchet MS', sans-serif;
+    font-size: 0.78rem;
+    text-align: center;
+}
+
+.auth-switch button {
+    border: 0;
+    background: transparent;
+    color: #f7c791;
+    padding: 0 0 0 6px;
+    font: inherit;
+    cursor: pointer;
+}
+
+.logout-button {
+    border: 1px solid rgba(245, 240, 232, 0.18);
+    background: transparent;
+    border-radius: 999px;
+    color: #f5f0e8;
+    cursor: pointer;
+    padding: 8px 14px;
+    font-family: 'Trebuchet MS', sans-serif;
+    font-size: 0.75rem;
+}

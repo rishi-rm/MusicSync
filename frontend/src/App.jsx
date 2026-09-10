@@ -1,11 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
-import { fetchSongs, SOCKET_URL, updateSongFavorite } from './api.js'
+import {
+    clearStoredAuthSession,
+    fetchSongs,
+    getStoredAuthSession,
+    saveAuthSession,
+    SOCKET_URL,
+    updateSongFavorite
+} from './api.js'
+import AuthScreen from './components/AuthScreen.jsx'
 import MusicPlayer from './components/MusicPlayer.jsx'
 import SongLibrary from './components/SongLibrary.jsx'
 import UploadSong from './components/UploadSong.jsx'
 
 export default function App() {
+    const [authSession, setAuthSession] = useState(() => getStoredAuthSession())
     const [songs, setSongs] = useState([])
     const [currentSong, setCurrentSong] = useState(null)
     const [searchQuery, setSearchQuery] = useState('')
@@ -18,6 +27,7 @@ export default function App() {
     const socketRef = useRef(null)
     const pendingPlaybackStateRef = useRef(null)
 
+    const isAuthenticated = Boolean(authSession?.token && authSession?.user)
     songsRef.current = songs
 
     function getPlaybackPosition(state) {
@@ -31,6 +41,27 @@ export default function App() {
     }
 
     useEffect(() => {
+        function handleAuthExpired() {
+            setAuthSession(null)
+            setSongs([])
+            setCurrentSong(null)
+            setSearchQuery('')
+            setSongsError('')
+            setFavoriteError('')
+            setFavoriteUpdatingId(null)
+            pendingPlaybackStateRef.current = null
+        }
+
+        window.addEventListener('auth:expired', handleAuthExpired)
+        return () => window.removeEventListener('auth:expired', handleAuthExpired)
+    }, [])
+
+    useEffect(() => {
+        if (!isAuthenticated) {
+            setLoadingSongs(false)
+            return undefined
+        }
+
         let cancelled = false
 
         async function loadSongs() {
@@ -67,10 +98,18 @@ export default function App() {
         return () => {
             cancelled = true
         }
-    }, [])
+    }, [isAuthenticated])
 
     useEffect(() => {
-        const socket = io(SOCKET_URL)
+        if (!isAuthenticated) {
+            if (socketRef.current) {
+                socketRef.current.disconnect()
+                socketRef.current = null
+            }
+            return undefined
+        }
+
+        const socket = io(SOCKET_URL, { auth: { token: authSession.token } })
         socketRef.current = socket
 
         socket.on('connect', () => {
@@ -105,7 +144,24 @@ export default function App() {
             socket.disconnect()
             socketRef.current = null
         }
-    }, [])
+    }, [authSession?.token, isAuthenticated])
+
+    function handleAuthenticated(session) {
+        setAuthSession(session)
+        saveAuthSession(session)
+    }
+
+    function handleLogout() {
+        clearStoredAuthSession()
+        setAuthSession(null)
+        setSongs([])
+        setCurrentSong(null)
+        setSearchQuery('')
+        setSongsError('')
+        setFavoriteError('')
+        setFavoriteUpdatingId(null)
+        pendingPlaybackStateRef.current = null
+    }
 
     function selectSong(song, announce = true) {
         setCurrentSong(song)
@@ -174,6 +230,10 @@ export default function App() {
         socketRef.current.emit('song_ended', { songId })
     }
 
+    if (!isAuthenticated) {
+        return <AuthScreen onAuthenticated={handleAuthenticated} />
+    }
+
     const normalizedQuery = searchQuery.trim().toLowerCase()
     const filteredSongs = songs.filter((song) => {
         if (!normalizedQuery) return true
@@ -201,17 +261,8 @@ export default function App() {
                         <p className="brand-tagline">A shared room for every song</p>
                     </div>
                 </div>
-                {/* <div className="connection-pill">
-                    <span className={`status-dot${socketConnected ? ' online' : ''}`} />
-                    {socketConnected ? 'Connected' : 'Connecting'}
-                </div> */}
+                <button type="button" className="logout-button" onClick={handleLogout}>Logout</button>
             </header>
-
-            {/* <section className="intro-block">
-                <p className="eyebrow">The listening room</p>
-                <h1>Bring the room<br /><span>into rhythm.</span></h1>
-                <p className="intro-copy">Build the shared queue now. Real-time playback will plug into the same song identity when streaming is ready.</p>
-            </section> */}
 
             <div className="content-grid">
                 <SongLibrary
