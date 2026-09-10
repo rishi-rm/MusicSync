@@ -9,7 +9,7 @@ function formatTime(seconds) {
     return `${minutes}:${remainingSeconds}`
 }
 
-export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, onLocalPause, onLocalSeek }) {
+export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, onLocalPause, onLocalSeek, onSongEnded }) {
     const audioRef = useRef(null)
     const pendingRemotePlayRef = useRef(false)
     const suppressPlayEventRef = useRef(false)
@@ -18,16 +18,30 @@ export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, 
     const onLocalPlayRef = useRef(onLocalPlay)
     const onLocalPauseRef = useRef(onLocalPause)
     const onLocalSeekRef = useRef(onLocalSeek)
+    const onSongEndedRef = useRef(onSongEnded)
     const [isPlaying, setIsPlaying] = useState(false)
     const [currentTime, setCurrentTime] = useState(0)
     const [duration, setDuration] = useState(0)
     const [playbackError, setPlaybackError] = useState('')
 
+    function handleRemotePlayFailure(error) {
+        suppressPlayEventRef.current = false
+
+        if (error?.name === 'NotAllowedError') {
+            setPlaybackError('Tap Play to allow playback on this device.')
+            return
+        }
+
+        console.error('Remote audio playback could not start:', error)
+        setPlaybackError('Remote playback could not start on this device.')
+    }
+
     useEffect(() => {
         onLocalPlayRef.current = onLocalPlay
         onLocalPauseRef.current = onLocalPause
         onLocalSeekRef.current = onLocalSeek
-    }, [onLocalPause, onLocalPlay, onLocalSeek])
+        onSongEndedRef.current = onSongEnded
+    }, [onLocalPause, onLocalPlay, onLocalSeek, onSongEnded])
 
     useEffect(() => {
         const audio = audioRef.current
@@ -53,9 +67,7 @@ export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, 
             pendingRemotePlayRef.current = false
             suppressPlayEventRef.current = true
             void audio.play().catch((error) => {
-                suppressPlayEventRef.current = false
-                console.error('Remote audio playback could not start once ready:', error)
-                setPlaybackError('Remote playback could not start on this device.')
+                handleRemotePlayFailure(error)
             })
         }
         const handleTimeUpdate = () => setCurrentTime(audio.currentTime)
@@ -88,6 +100,7 @@ export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, 
         const handleEnded = () => {
             setIsPlaying(false)
             setCurrentTime(0)
+            onSongEndedRef.current?.(song._id)
         }
         const handleError = () => {
             setPlaybackError('Unable to load this song from storage.')
@@ -133,9 +146,7 @@ export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, 
                 pendingRemotePlayRef.current = false
                 suppressPlayEventRef.current = true
                 void audio.play().catch((error) => {
-                    suppressPlayEventRef.current = false
-                    console.error('Remote audio playback could not start:', error)
-                    setPlaybackError('Remote playback could not start on this device.')
+                    handleRemotePlayFailure(error)
                 })
             }
             return
@@ -158,6 +169,7 @@ export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, 
         if (!audio || !song) return
 
         setPlaybackError('')
+        pendingRemotePlayRef.current = false
 
         try {
             await audio.play()

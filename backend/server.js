@@ -314,9 +314,37 @@ const playbackState = {
     position: 0,
     updatedAt: Date.now()
 }
+let nextSongSelectionInProgress = false
 
 function broadcastPlaybackState() {
     io.emit('playback_state', { ...playbackState })
+}
+
+async function selectRandomNextSong(endedSongId) {
+    if (nextSongSelectionInProgress || playbackState.currentSongId !== endedSongId || !playbackState.isPlaying) return
+
+    nextSongSelectionInProgress = true
+
+    try {
+        const songs = await Song.find({}, { _id: 1 })
+        if (playbackState.currentSongId !== endedSongId || !playbackState.isPlaying || songs.length === 0) return
+
+        const nextSongs = songs.length > 1
+            ? songs.filter((song) => song._id.toString() !== endedSongId)
+            : songs
+        const nextSong = nextSongs[Math.floor(Math.random() * nextSongs.length)]
+
+        playbackState.currentSongId = nextSong._id.toString()
+        playbackState.isPlaying = true
+        playbackState.position = 0
+        playbackState.updatedAt = Date.now()
+        console.log('[SOCKET] Broadcasting random next song:', playbackState.currentSongId)
+        broadcastPlaybackState()
+    } catch (error) {
+        console.error('Failed to select a random next song:', error.message)
+    } finally {
+        nextSongSelectionInProgress = false
+    }
 }
 
 io.on('connection', (socket) => {
@@ -340,6 +368,14 @@ io.on('connection', (socket) => {
         playbackState.updatedAt = Date.now()
         console.log('[SOCKET] Broadcasting song change:', songId)
         broadcastPlaybackState()
+    })
+
+    socket.on('song_ended', (data) => {
+        const songId = data?.songId
+        if (!songId) return
+
+        console.log('[SOCKET] Received song ended:', songId, 'from', socket.id)
+        void selectRandomNextSong(songId)
     })
 
     socket.on('pause', (data) => {

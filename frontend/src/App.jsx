@@ -167,6 +167,13 @@ export default function App() {
         socketRef.current.emit(event, payload)
     }
 
+    function handleSongEnded(songId) {
+        if (!socketRef.current?.connected || !songId) return
+
+        console.log('[SOCKET] Emitting song ended:', songId)
+        socketRef.current.emit('song_ended', { songId })
+    }
+
     const normalizedQuery = searchQuery.trim().toLowerCase()
     const filteredSongs = songs.filter((song) => {
         if (!normalizedQuery) return true
@@ -229,6 +236,7 @@ export default function App() {
                 onLocalPlay={(position, songId) => emitPlaybackEvent('play', songId, position)}
                 onLocalPause={(position, songId) => emitPlaybackEvent('pause', songId, position)}
                 onLocalSeek={(position, songId) => emitPlaybackEvent('seek', songId, position)}
+                onSongEnded={handleSongEnded}
             />
         </main>
     )
