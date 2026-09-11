@@ -17,6 +17,7 @@ import SongLibrary from './components/SongLibrary.jsx'
 import UploadSong from './components/UploadSong.jsx'
 
 const SHOW_MUSIC_PLAYER = false
+const SHOW_MUSIC_LIBRARY = false
 
 export default function App() {
     const [authSession, setAuthSession] = useState(() => getStoredAuthSession())
@@ -358,20 +359,22 @@ export default function App() {
                 <>
                     <HomeDashboard songs={songs} loading={loadingSongs} user={authSession.user} />
 
-                    <div className="content-grid">
-                        <SongLibrary
-                            songs={filteredSongs}
-                            selectedSongId={currentSong?._id}
-                            searchQuery={searchQuery}
-                            onSearchChange={setSearchQuery}
-                            onSelectSong={selectSong}
-                            onFavoriteChange={handleFavoriteChange}
-                            favoriteUpdatingId={favoriteUpdatingId}
-                            loading={loadingSongs}
-                            error={songsError}
-                            favoriteError={favoriteError}
-                        />
-                    </div>
+                    {SHOW_MUSIC_LIBRARY && (
+                        <div className="content-grid">
+                            <SongLibrary
+                                songs={filteredSongs}
+                                selectedSongId={currentSong?._id}
+                                searchQuery={searchQuery}
+                                onSearchChange={setSearchQuery}
+                                onSelectSong={selectSong}
+                                onFavoriteChange={handleFavoriteChange}
+                                favoriteUpdatingId={favoriteUpdatingId}
+                                loading={loadingSongs}
+                                error={songsError}
+                                favoriteError={favoriteError}
+                            />
+                        </div>
+                    )}
                 </>
             )}
 
@@ -420,10 +423,6 @@ export default function App() {
                 <button type="button" aria-label="Chat">
                     <span aria-hidden="true">⌁</span>
                     <span>Chat</span>
-                </button>
-                <button type="button" aria-label="Music library">
-                    <span aria-hidden="true">♫</span>
-                    <span>Library</span>
                 </button>
                 <button className={activeTab === 'profile' ? 'active' : ''} type="button" aria-current={activeTab === 'profile' ? 'page' : undefined} aria-label="Profile" onClick={() => setActiveTab('profile')}>
                     <span aria-hidden="true">◯</span>
