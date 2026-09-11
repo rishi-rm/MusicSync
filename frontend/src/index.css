@@ -102,7 +102,8 @@ h2 { margin-top: 5px; color: #fff7ed; font-size: 1.7rem; font-weight: 400; }
 .song-menu-wrap { position: relative; flex: 0 0 auto; }
 .song-menu-button { display: grid; width: 36px; height: 36px; place-items: center; border: 0; border-radius: 50%; background: transparent; color: #b5c3bc; cursor: pointer; font-size: 1.35rem; line-height: 1; }
 .song-menu-button:hover, .song-menu-button:focus-visible { background: rgba(229, 154, 92, 0.16); color: #f8eee2; outline: none; }
-.song-menu { position: absolute; z-index: 2; top: calc(100% + 4px); right: 0; width: max-content; min-width: 190px; max-width: min(260px, calc(100vw - 48px)); border: 1px solid rgba(245, 240, 232, 0.18); background: #18221f; box-shadow: 0 12px 25px rgba(0, 0, 0, 0.3); }
+.song-menu { position: absolute; z-index: 1000; top: calc(100% + 4px); right: 0; width: max-content; min-width: 190px; max-width: min(260px, calc(100vw - 48px)); border: 1px solid rgba(245, 240, 232, 0.18); background: #18221f; box-shadow: 0 12px 25px rgba(0, 0, 0, 0.3); }
+.song-menu-floating { position: fixed; top: auto; right: auto; width: 210px; max-width: calc(100vw - 16px); }
 .song-menu button { width: 100%; border: 0; padding: 11px 13px; background: transparent; color: #f5f0e8; cursor: pointer; font-family: 'Trebuchet MS', sans-serif; font-size: 0.73rem; text-align: left; }
 .song-menu button:hover, .song-menu button:focus-visible { background: rgba(229, 154, 92, 0.14); outline: none; }
 .song-menu .danger-menu-item { color: #f2a18b; }

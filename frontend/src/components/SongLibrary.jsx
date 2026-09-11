@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 function formatDate(dateValue) {
     if (!dateValue) return ''
@@ -12,13 +13,17 @@ function formatDate(dateValue) {
 
 export default function SongLibrary({ songs, selectedSongId, searchQuery, onSearchChange, onSelectSong, onFavoriteChange, favoriteUpdatingId, loading, error, favoriteError, onUpload, onRename, onDelete }) {
     const [openMenuId, setOpenMenuId] = useState(null)
+    const [menuPosition, setMenuPosition] = useState(null)
     const menuRef = useRef(null)
 
     useEffect(() => {
         if (!openMenuId) return undefined
 
         function closeMenu(event) {
-            if (!menuRef.current?.contains(event.target)) setOpenMenuId(null)
+            if (!menuRef.current?.contains(event.target) && !event.target.closest('.song-menu')) {
+                setOpenMenuId(null)
+                setMenuPosition(null)
+            }
         }
 
         document.addEventListener('mousedown', closeMenu)
@@ -108,13 +113,29 @@ export default function SongLibrary({ songs, selectedSongId, searchQuery, onSear
                                         aria-expanded={openMenuId === song._id}
                                         onClick={(event) => {
                                             event.stopPropagation()
-                                            setOpenMenuId((currentId) => currentId === song._id ? null : song._id)
+                                            setOpenMenuId((currentId) => {
+                                                if (currentId === song._id) {
+                                                    setMenuPosition(null)
+                                                    return null
+                                                }
+
+                                                const buttonBounds = event.currentTarget.getBoundingClientRect()
+                                                const menuHeight = 150
+                                                const shouldOpenUp = window.innerHeight - buttonBounds.bottom < menuHeight + 8
+                                                setMenuPosition({
+                                                    left: Math.max(8, buttonBounds.right - 210),
+                                                    top: shouldOpenUp
+                                                        ? Math.max(8, buttonBounds.top - menuHeight - 4)
+                                                        : buttonBounds.bottom + 4
+                                                })
+                                                return song._id
+                                            })
                                         }}
                                     >
                                         ⋮
                                     </button>
-                                    {openMenuId === song._id && (
-                                        <div className="song-menu" role="menu">
+                                    {openMenuId === song._id && menuPosition && createPortal(
+                                        <div className="song-menu song-menu-floating" role="menu" style={{ left: menuPosition.left, top: menuPosition.top }}>
                                             <button
                                                 type="button"
                                                 role="menuitem"
@@ -150,7 +171,8 @@ export default function SongLibrary({ songs, selectedSongId, searchQuery, onSear
                                             >
                                                 Delete
                                             </button>
-                                        </div>
+                                        </div>,
+                                        document.body
                                     )}
                                 </span>
                             </div>
