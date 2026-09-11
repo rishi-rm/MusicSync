@@ -23,9 +23,12 @@ export default function App() {
     const [favoriteError, setFavoriteError] = useState('')
     const [favoriteUpdatingId, setFavoriteUpdatingId] = useState(null)
     const [remotePlaybackCommand, setRemotePlaybackCommand] = useState(null)
+    const [menuOpen, setMenuOpen] = useState(false)
+    const [uploadModalOpen, setUploadModalOpen] = useState(false)
     const songsRef = useRef([])
     const socketRef = useRef(null)
     const pendingPlaybackStateRef = useRef(null)
+    const menuRef = useRef(null)
 
     const isAuthenticated = Boolean(authSession?.token && authSession?.user)
     songsRef.current = songs
@@ -146,6 +149,28 @@ export default function App() {
         }
     }, [authSession?.token, isAuthenticated])
 
+    useEffect(() => {
+        if (!menuOpen && !uploadModalOpen) return undefined
+
+        function handleEscape(event) {
+            if (event.key === 'Escape') {
+                setMenuOpen(false)
+                setUploadModalOpen(false)
+            }
+        }
+
+        function handlePointerDown(event) {
+            if (menuOpen && !menuRef.current?.contains(event.target)) setMenuOpen(false)
+        }
+
+        document.addEventListener('keydown', handleEscape)
+        document.addEventListener('pointerdown', handlePointerDown)
+        return () => {
+            document.removeEventListener('keydown', handleEscape)
+            document.removeEventListener('pointerdown', handlePointerDown)
+        }
+    }, [menuOpen, uploadModalOpen])
+
     function handleAuthenticated(session) {
         setAuthSession(session)
         saveAuthSession(session)
@@ -261,7 +286,36 @@ export default function App() {
                         <p className="brand-tagline">A shared room for every song</p>
                     </div>
                 </div>
-                <button type="button" className="logout-button" onClick={handleLogout}>Logout</button>
+                <div ref={menuRef} className="app-menu-wrap">
+                    <button
+                        type="button"
+                        className="app-menu-button"
+                        aria-label="Open application menu"
+                        aria-expanded={menuOpen}
+                        onClick={() => setMenuOpen((open) => !open)}
+                    >
+                        <span aria-hidden="true">☰</span>
+                    </button>
+                    {menuOpen && (
+                        <div className="app-menu" role="menu">
+                            <button
+                                type="button"
+                                role="menuitem"
+                                onClick={() => {
+                                    setMenuOpen(false)
+                                    setUploadModalOpen(true)
+                                }}
+                            >
+                                <span aria-hidden="true">♫</span>
+                                Upload Music
+                            </button>
+                            <button type="button" role="menuitem" onClick={handleLogout}>
+                                <span aria-hidden="true">↪</span>
+                                Logout
+                            </button>
+                        </div>
+                    )}
+                </div>
             </header>
 
             <div className="content-grid">
@@ -277,8 +331,32 @@ export default function App() {
                     error={songsError}
                     favoriteError={favoriteError}
                 />
-                <UploadSong onSongUploaded={handleSongUploaded} />
             </div>
+
+            {uploadModalOpen && (
+                <div
+                    className="modal-backdrop"
+                    role="presentation"
+                    onMouseDown={(event) => {
+                        if (event.target === event.currentTarget) setUploadModalOpen(false)
+                    }}
+                >
+                    <section className="upload-modal" role="dialog" aria-modal="true" aria-labelledby="upload-modal-title">
+                        <div className="modal-heading">
+                            <h2 id="upload-modal-title">Upload Music</h2>
+                            <button
+                                type="button"
+                                className="modal-close-button"
+                                aria-label="Close upload music dialog"
+                                onClick={() => setUploadModalOpen(false)}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        <UploadSong onSongUploaded={handleSongUploaded} />
+                    </section>
+                </div>
+            )}
 
             <MusicPlayer
                 key={currentSong?._id || 'empty-player'}

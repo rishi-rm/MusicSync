@@ -24,6 +24,13 @@ button { color: inherit; }
 .app-shell { --player-space: 146px; width: min(1180px, calc(100% - 48px)); margin: 0 auto; padding: 30px 0 var(--player-space); }
 .app-header, .section-heading, .brand-lockup, .connection-pill, .player-panel, .player-controls, .song-row, .search-field { display: flex; align-items: center; }
 .app-header { justify-content: space-between; border-bottom: 1px solid rgba(245, 240, 232, 0.16); padding-bottom: 22px; }
+.app-menu-wrap { position: relative; }
+.app-menu-button { display: grid; width: 44px; height: 44px; place-items: center; border: 1px solid rgba(245, 240, 232, 0.2); border-radius: 50%; background: rgba(13, 20, 19, 0.45); color: #f0a15b; cursor: pointer; font-family: 'Trebuchet MS', sans-serif; font-size: 1.2rem; line-height: 1; }
+.app-menu-button:hover, .app-menu-button:focus-visible { border-color: #e59a5c; background: rgba(229, 154, 92, 0.14); color: #fff7ed; outline: none; }
+.app-menu { position: absolute; z-index: 12; top: calc(100% + 10px); right: 0; width: 190px; border: 1px solid rgba(245, 240, 232, 0.18); background: #18221f; box-shadow: 0 14px 30px rgba(0, 0, 0, 0.35); }
+.app-menu button { display: flex; width: 100%; align-items: center; gap: 10px; border: 0; padding: 13px 15px; background: transparent; color: #f5f0e8; cursor: pointer; font-family: 'Trebuchet MS', sans-serif; font-size: 0.78rem; text-align: left; }
+.app-menu button span { width: 18px; color: #e59a5c; font-size: 1rem; text-align: center; }
+.app-menu button:hover, .app-menu button:focus-visible { background: rgba(229, 154, 92, 0.14); outline: none; }
 .brand-lockup { gap: 12px; }
 .brand-mark { display: grid; width: 42px; height: 42px; place-items: center; border: 1px solid #d78b4e; border-radius: 50%; color: #f0a15b; font-size: 27px; }
 .brand-name, .brand-tagline, .eyebrow, .intro-copy, .player-copy p, .player-note, .state-message, .derived-title { margin: 0; }
@@ -81,6 +88,13 @@ h2 { margin-top: 5px; color: #fff7ed; font-size: 1.7rem; font-weight: 400; }
 .derived-title { color: #d8a375; font-family: 'Trebuchet MS', sans-serif; font-size: 0.75rem; }
 .primary-button { border: 0; border-radius: 2px; padding: 12px 15px; background: #e59a5c; color: #1b211d; cursor: pointer; font-family: 'Trebuchet MS', sans-serif; font-size: 0.76rem; font-weight: 700; }
 .primary-button:disabled { cursor: wait; opacity: 0.55; }
+.modal-backdrop { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(4, 8, 7, 0.7); backdrop-filter: blur(5px); overflow-y: auto; }
+.upload-modal { position: relative; width: min(100%, 540px); max-height: calc(100vh - 48px); overflow-y: auto; border: 1px solid rgba(245, 240, 232, 0.2); background: #18221f; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.48); padding: 24px; }
+.modal-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.modal-heading h2 { margin: 0; }
+.modal-close-button { display: grid; width: 40px; height: 40px; flex: 0 0 auto; place-items: center; border: 1px solid rgba(245, 240, 232, 0.18); border-radius: 50%; background: transparent; color: #f5f0e8; cursor: pointer; font-size: 1.7rem; line-height: 1; }
+.modal-close-button:hover, .modal-close-button:focus-visible { border-color: #e59a5c; color: #f0a15b; outline: none; }
+.upload-modal .upload-panel { min-height: 0; padding: 0; border: 0; background: transparent; box-shadow: none; }
 .player-panel { position: fixed; z-index: 10; right: 0; bottom: max(12px, env(safe-area-inset-bottom)); left: 50%; display: grid; width: min(1180px, calc(100% - 48px)); grid-template-columns: auto minmax(0, 1fr) minmax(190px, 0.7fr) auto; gap: 16px; align-items: center; margin: 0; padding: 12px 18px; border-color: rgba(245, 240, 232, 0.22); background: #18221f; box-shadow: 0 14px 35px rgba(0, 0, 0, 0.35); transform: translateX(-50%); }
 .player-art { display: grid; width: 48px; height: 48px; place-items: center; border: 1px solid #d78b4e; border-radius: 50%; color: #e59a5c; font-size: 1.45rem; }
 .player-copy { min-width: 0; }
@@ -121,6 +135,8 @@ h2 { margin-top: 5px; color: #fff7ed; font-size: 1.7rem; font-weight: 400; }
     .brand-name { font-size: 1.05rem; }
     .brand-tagline { font-size: 0.66rem; }
     .panel { min-height: 0; padding: 16px; }
+    .modal-backdrop { padding: 12px; }
+    .upload-modal { max-height: calc(100vh - 24px); padding: 18px 16px; }
     .section-heading { margin-bottom: 16px; }
     h2 { font-size: 1.45rem; }
     .song-row { gap: 9px; padding: 12px 6px; }
