@@ -14,7 +14,7 @@ export default function HomeDashboard({ songs, loading, user, recentChats = [], 
             <div className="home-intro">
                 <p className="eyebrow">Your listening room</p>
                 <div className="home-title-row">
-                    <h1 id="home-heading">Welcome back, <span>{displayName}</span></h1>
+                    {/* <h1 id="home-heading">Welcome back, <span>{displayName}</span></h1> */}
                     <button type="button" className="primary-button create-room-button" onClick={onCreateRoom}>Create Room</button>
                 </div>
                 <p className="intro-copy">A small view of what is moving through your room.</p>
