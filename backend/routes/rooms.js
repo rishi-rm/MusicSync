@@ -30,12 +30,14 @@ function serializeRoom(room) {
             songId: room.playback.songId ? room.playback.songId.toString() : null,
             isPlaying: Boolean(room.playback.isPlaying),
             position: Number(room.playback.position) || 0,
-            updatedAt: room.playback.updatedAt
+            updatedAt: room.playback.updatedAt,
+            startedAt: room.playback.startedAt || null
         } : {
             songId: null,
             isPlaying: false,
             position: 0,
-            updatedAt: null
+            updatedAt: null,
+            startedAt: null
         }
     }
 }

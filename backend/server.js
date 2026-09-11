@@ -386,10 +386,58 @@ const playbackState = {
     position: 0,
     updatedAt: Date.now()
 }
+const roomPlaybackStates = new Map()
 let nextSongSelectionInProgress = false
+
+function buildRoomPlaybackPayload(room, overrides = {}) {
+    const roomPlayback = room?.playback || {}
+    const currentSongId = roomPlayback.songId ? roomPlayback.songId.toString() : null
+    const playbackStateValue = roomPlayback.isPlaying ? 'playing' : 'paused'
+    const basePayload = {
+        roomId: room._id.toString(),
+        currentSongId,
+        playbackState: playbackStateValue,
+        playbackPosition: Number(roomPlayback.position) || 0,
+        lastUpdatedAt: roomPlayback.updatedAt ? new Date(roomPlayback.updatedAt).getTime() : Date.now(),
+        startedAt: roomPlayback.startedAt ? new Date(roomPlayback.startedAt).getTime() : null
+    }
+
+    return {
+        ...basePayload,
+        ...overrides,
+        roomId: room._id.toString()
+    }
+}
 
 function broadcastPlaybackState() {
     io.emit('playback_state', { ...playbackState })
+}
+
+async function persistRoomPlaybackState(room, payload) {
+    const nextRoomPlayback = {
+        songId: payload.currentSongId ? new mongoose.Types.ObjectId(payload.currentSongId) : null,
+        isPlaying: payload.playbackState === 'playing',
+        position: Number(payload.playbackPosition) || 0,
+        updatedAt: new Date(payload.lastUpdatedAt),
+        startedAt: payload.startedAt ? new Date(payload.startedAt) : null
+    }
+
+    room.playback = nextRoomPlayback
+    room.lastActivity = new Date(payload.lastUpdatedAt)
+    await room.save()
+
+    const authoritativeState = {
+        roomId: room._id.toString(),
+        currentSongId: payload.currentSongId,
+        playbackState: payload.playbackState,
+        playbackPosition: Number(payload.playbackPosition) || 0,
+        lastUpdatedAt: Number(payload.lastUpdatedAt) || Date.now(),
+        startedAt: payload.startedAt ? Number(payload.startedAt) : null
+    }
+
+    roomPlaybackStates.set(room._id.toString(), authoritativeState)
+    io.to(`room:${room._id.toString()}`).emit('room:playback_state', authoritativeState)
+    return authoritativeState
 }
 
 async function selectRandomNextSong(endedSongId) {
@@ -472,6 +520,8 @@ io.on('connection', (socket) => {
             }
 
             socket.join(`room:${room._id.toString()}`)
+            const authoritativeState = roomPlaybackStates.get(room._id.toString()) || buildRoomPlaybackPayload(room)
+            socket.emit('room:playback_state', authoritativeState)
             callback?.({ success: true, roomId: room._id.toString() })
         } catch (error) {
             callback?.({ success: false, message: error.message || 'Unable to join room.' })
@@ -498,27 +548,133 @@ io.on('connection', (socket) => {
             }
 
             const songId = data.songId || null
-            const position = Number.isFinite(Number(data.position)) ? Number(data.position) : 0
-            const isPlaying = data.shouldPlay !== false
-
-            room.playback = {
-                songId: songId || null,
-                isPlaying,
-                position,
-                updatedAt: new Date()
+            if (!songId) {
+                throw Object.assign(new Error('A song is required.'), { statusCode: 400 })
             }
-            room.lastActivity = new Date()
-            await room.save()
 
-            const payload = {
+            const roomSong = await Song.findOne({ _id: songId, uploadedBy: { $in: room.members } })
+            if (!roomSong) {
+                throw Object.assign(new Error('That song is not available in this room.'), { statusCode: 403 })
+            }
+
+            const startedAt = Date.now() + 750
+            const payload = await persistRoomPlaybackState(room, {
                 roomId: room._id.toString(),
-                songId: room.playback.songId ? room.playback.songId.toString() : null,
-                isPlaying: room.playback.isPlaying,
-                position: room.playback.position,
-                updatedAt: room.playback.updatedAt
+                currentSongId: songId,
+                playbackState: 'playing',
+                playbackPosition: 0,
+                lastUpdatedAt: Date.now(),
+                startedAt
+            })
+
+            callback?.({ success: true, room: payload })
+        } catch (error) {
+            callback?.({ success: false, message: error.message || 'Room playback update failed.' })
+        }
+    })
+
+    socket.on('room:play', async (data, callback) => {
+        try {
+            if (!data || typeof data !== 'object') {
+                throw Object.assign(new Error('Invalid room playback payload.'), { statusCode: 400 })
             }
 
-            io.to(`room:${room._id.toString()}`).emit('room:playback_state', payload)
+            const room = await Room.findById(data.roomId)
+            if (!room) {
+                throw Object.assign(new Error('Room not found.'), { statusCode: 404 })
+            }
+
+            if (!room.members.some((memberId) => memberId.toString() === socket.userId)) {
+                throw Object.assign(new Error('You are not a member of this room.'), { statusCode: 403 })
+            }
+
+            const existingSongId = room.playback?.songId ? room.playback.songId.toString() : null
+            const currentSongId = data.songId || existingSongId
+            if (!currentSongId) {
+                throw Object.assign(new Error('No song is selected for this room.'), { statusCode: 409 })
+            }
+
+            const position = Number.isFinite(Number(data.position)) ? Number(data.position) : Number(room.playback?.position) || 0
+            const startedAt = Date.now() + 650
+            const payload = await persistRoomPlaybackState(room, {
+                roomId: room._id.toString(),
+                currentSongId,
+                playbackState: 'playing',
+                playbackPosition: position,
+                lastUpdatedAt: Date.now(),
+                startedAt
+            })
+
+            callback?.({ success: true, room: payload })
+        } catch (error) {
+            callback?.({ success: false, message: error.message || 'Room playback update failed.' })
+        }
+    })
+
+    socket.on('room:pause', async (data, callback) => {
+        try {
+            if (!data || typeof data !== 'object') {
+                throw Object.assign(new Error('Invalid room playback payload.'), { statusCode: 400 })
+            }
+
+            const room = await Room.findById(data.roomId)
+            if (!room) {
+                throw Object.assign(new Error('Room not found.'), { statusCode: 404 })
+            }
+
+            if (!room.members.some((memberId) => memberId.toString() === socket.userId)) {
+                throw Object.assign(new Error('You are not a member of this room.'), { statusCode: 403 })
+            }
+
+            const currentSongId = data.songId || (room.playback?.songId ? room.playback.songId.toString() : null)
+            const position = Number.isFinite(Number(data.position)) ? Number(data.position) : Number(room.playback?.position) || 0
+            const payload = await persistRoomPlaybackState(room, {
+                roomId: room._id.toString(),
+                currentSongId,
+                playbackState: 'paused',
+                playbackPosition: position,
+                lastUpdatedAt: Date.now(),
+                startedAt: null
+            })
+
+            callback?.({ success: true, room: payload })
+        } catch (error) {
+            callback?.({ success: false, message: error.message || 'Room playback update failed.' })
+        }
+    })
+
+    socket.on('room:seek', async (data, callback) => {
+        try {
+            if (!data || typeof data !== 'object') {
+                throw Object.assign(new Error('Invalid room playback payload.'), { statusCode: 400 })
+            }
+
+            const room = await Room.findById(data.roomId)
+            if (!room) {
+                throw Object.assign(new Error('Room not found.'), { statusCode: 404 })
+            }
+
+            if (!room.members.some((memberId) => memberId.toString() === socket.userId)) {
+                throw Object.assign(new Error('You are not a member of this room.'), { statusCode: 403 })
+            }
+
+            const currentSongId = data.songId || (room.playback?.songId ? room.playback.songId.toString() : null)
+            if (!currentSongId) {
+                throw Object.assign(new Error('No active song to seek.'), { statusCode: 409 })
+            }
+
+            const position = Number.isFinite(Number(data.position)) ? Number(data.position) : Number(room.playback?.position) || 0
+            const nextPlayState = room.playback?.isPlaying ? 'playing' : 'paused'
+            const startedAt = nextPlayState === 'playing' ? Date.now() + 400 : null
+            const payload = await persistRoomPlaybackState(room, {
+                roomId: room._id.toString(),
+                currentSongId,
+                playbackState: nextPlayState,
+                playbackPosition: position,
+                lastUpdatedAt: Date.now(),
+                startedAt
+            })
+
             callback?.({ success: true, room: payload })
         } catch (error) {
             callback?.({ success: false, message: error.message || 'Room playback update failed.' })

@@ -9,7 +9,8 @@ const roomSchema = new mongoose.Schema({
         songId: { type: mongoose.Schema.Types.ObjectId, ref: 'Song', default: null },
         isPlaying: { type: Boolean, default: false },
         position: { type: Number, default: 0 },
-        updatedAt: { type: Date, default: Date.now }
+        updatedAt: { type: Date, default: Date.now },
+        startedAt: { type: Date, default: null }
     }
 }, { timestamps: true })
 

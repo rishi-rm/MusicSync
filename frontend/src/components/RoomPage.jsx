@@ -70,14 +70,23 @@ export default function RoomPage({ roomId, socket, onLeaveRoom }) {
         socket.on('room:playback_state', (payload) => {
             if (payload?.roomId !== roomId) return
             setRoomPlaybackState(payload)
-            const nextSongId = payload?.songId
+            const nextSongId = payload?.currentSongId || payload?.songId
             if (!nextSongId) {
                 setSelectedSong(null)
                 return
             }
 
             const nextSong = flattenedSongs.find((song) => song._id === nextSongId)
-            if (nextSong) setSelectedSong(nextSong)
+            if (nextSong) {
+                setSelectedSong(nextSong)
+                setRoomPlaybackCommand({
+                    type: payload.playbackState === 'playing' ? 'play' : 'pause',
+                    songId: nextSongId,
+                    position: Number(payload.playbackPosition) || 0,
+                    startAt: payload.startedAt ? Number(payload.startedAt) : null,
+                    playbackState: payload.playbackState
+                })
+            }
         })
 
         return () => {
@@ -98,13 +107,21 @@ export default function RoomPage({ roomId, socket, onLeaveRoom }) {
 
     function handleSelectSong(song, shouldPlay = true) {
         if (!socket || !roomId || !song?._id) return
+        const startAt = Date.now() + 750
         setSelectedSong(song)
-        setRoomPlaybackCommand({ type: shouldPlay ? 'play' : 'pause', songId: song._id, position: 0 })
+        setRoomPlaybackCommand({
+            type: shouldPlay ? 'play' : 'pause',
+            songId: song._id,
+            position: 0,
+            startAt,
+            playbackState: shouldPlay ? 'playing' : 'paused'
+        })
         socket.emit('room:select_song', {
             roomId,
             songId: song._id,
             shouldPlay,
-            position: 0
+            position: 0,
+            startedAt: startAt
         })
     }
 
@@ -189,10 +206,10 @@ export default function RoomPage({ roomId, socket, onLeaveRoom }) {
                     compact
                     song={selectedSong}
                     remotePlaybackCommand={roomPlaybackCommand}
-                    onLocalPlay={(position, songId) => socket?.emit('room:select_song', { roomId, songId, shouldPlay: true, position })}
-                    onLocalPause={(position, songId) => socket?.emit('room:select_song', { roomId, songId, shouldPlay: false, position })}
-                    onLocalSeek={(position, songId) => socket?.emit('room:select_song', { roomId, songId, shouldPlay: roomPlaybackState?.isPlaying ?? true, position })}
-                    onSongEnded={(songId) => socket?.emit('room:select_song', { roomId, songId, shouldPlay: false, position: 0 })}
+                    onLocalPlay={(position, songId) => socket?.emit('room:play', { roomId, songId, position, playbackState: 'playing' })}
+                    onLocalPause={(position, songId) => socket?.emit('room:pause', { roomId, songId, position, playbackState: 'paused' })}
+                    onLocalSeek={(position, songId) => socket?.emit('room:seek', { roomId, songId, position, playbackState: roomPlaybackState?.playbackState || 'playing' })}
+                    onSongEnded={(songId) => socket?.emit('room:pause', { roomId, songId, position: 0, playbackState: 'paused' })}
                 />
             )}
 

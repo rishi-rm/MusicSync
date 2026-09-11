@@ -15,6 +15,7 @@ export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, 
     const suppressPlayEventRef = useRef(false)
     const suppressPauseEventRef = useRef(false)
     const suppressSeekEventRef = useRef(false)
+    const scheduledPlaybackTimeoutRef = useRef(null)
     const onLocalPlayRef = useRef(onLocalPlay)
     const onLocalPauseRef = useRef(onLocalPause)
     const onLocalSeekRef = useRef(onLocalSeek)
@@ -34,6 +35,20 @@ export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, 
 
         console.error('Remote audio playback could not start:', error)
         setPlaybackError('Remote playback could not start on this device.')
+    }
+
+    function calculateEffectivePosition(command) {
+        if (!command || !Number.isFinite(Number(command.position))) return 0
+
+        const basePosition = Number(command.position)
+        const startAt = Number(command.startAt ?? command.startedAt ?? command.lastUpdatedAt)
+
+        if ((command.type === 'play' || command.playbackState === 'playing') && Number.isFinite(startAt) && startAt > 0) {
+            const elapsedSeconds = Math.max(0, (Date.now() - startAt) / 1000)
+            return basePosition + elapsedSeconds
+        }
+
+        return basePosition
     }
 
     useEffect(() => {
@@ -134,13 +149,35 @@ export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, 
         if (!audio || !remotePlaybackCommand || !song?._id) return
         if (remotePlaybackCommand.songId && remotePlaybackCommand.songId !== song._id) return
 
-        const position = Number(remotePlaybackCommand.position)
-        if (Number.isFinite(position)) {
-            suppressSeekEventRef.current = true
-            audio.currentTime = position
+        if (scheduledPlaybackTimeoutRef.current) {
+            clearTimeout(scheduledPlaybackTimeoutRef.current)
+            scheduledPlaybackTimeoutRef.current = null
         }
 
-        if (remotePlaybackCommand.type === 'play') {
+        const position = calculateEffectivePosition(remotePlaybackCommand)
+        if (Number.isFinite(position)) {
+            suppressSeekEventRef.current = true
+            audio.currentTime = Math.max(0, position)
+        }
+
+        const shouldPlay = remotePlaybackCommand.type === 'play' || remotePlaybackCommand.playbackState === 'playing'
+
+        if (shouldPlay) {
+            const startAt = Number(remotePlaybackCommand.startAt ?? remotePlaybackCommand.startedAt ?? remotePlaybackCommand.lastUpdatedAt ?? Date.now())
+            const waitMs = Number.isFinite(startAt) ? Math.max(0, startAt - Date.now()) : 0
+
+            if (waitMs > 0) {
+                scheduledPlaybackTimeoutRef.current = setTimeout(() => {
+                    if (!audioRef.current || !song?._id) return
+                    suppressPlayEventRef.current = true
+                    pendingRemotePlayRef.current = false
+                    void audioRef.current.play().catch((error) => {
+                        handleRemotePlayFailure(error)
+                    })
+                }, waitMs)
+                return
+            }
+
             pendingRemotePlayRef.current = true
             if (audio.readyState >= 2) {
                 pendingRemotePlayRef.current = false
@@ -152,7 +189,7 @@ export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, 
             return
         }
 
-        if (remotePlaybackCommand.type === 'pause') {
+        if (remotePlaybackCommand.type === 'pause' || remotePlaybackCommand.playbackState === 'paused') {
             pendingRemotePlayRef.current = false
             suppressPauseEventRef.current = !audio.paused
             audio.pause()
@@ -163,6 +200,13 @@ export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, 
             pendingRemotePlayRef.current = false
         }
     }, [remotePlaybackCommand, song?._id])
+
+    useEffect(() => () => {
+        if (scheduledPlaybackTimeoutRef.current) {
+            clearTimeout(scheduledPlaybackTimeoutRef.current)
+            scheduledPlaybackTimeoutRef.current = null
+        }
+    }, [])
 
     async function handlePlay() {
         const audio = audioRef.current
