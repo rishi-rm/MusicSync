@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
 import {
     clearStoredAuthSession,
+    fetchCurrentUser,
     fetchSongs,
     getStoredAuthSession,
     saveAuthSession,
@@ -11,8 +12,11 @@ import {
 import AuthScreen from './components/AuthScreen.jsx'
 import HomeDashboard from './components/HomeDashboard.jsx'
 import MusicPlayer from './components/MusicPlayer.jsx'
+import ProfilePage from './components/ProfilePage.jsx'
 import SongLibrary from './components/SongLibrary.jsx'
 import UploadSong from './components/UploadSong.jsx'
+
+const SHOW_MUSIC_PLAYER = false
 
 export default function App() {
     const [authSession, setAuthSession] = useState(() => getStoredAuthSession())
@@ -26,6 +30,7 @@ export default function App() {
     const [remotePlaybackCommand, setRemotePlaybackCommand] = useState(null)
     const [menuOpen, setMenuOpen] = useState(false)
     const [uploadModalOpen, setUploadModalOpen] = useState(false)
+    const [activeTab, setActiveTab] = useState('home')
     const songsRef = useRef([])
     const socketRef = useRef(null)
     const pendingPlaybackStateRef = useRef(null)
@@ -53,12 +58,41 @@ export default function App() {
             setSongsError('')
             setFavoriteError('')
             setFavoriteUpdatingId(null)
+            setActiveTab('home')
             pendingPlaybackStateRef.current = null
         }
 
         window.addEventListener('auth:expired', handleAuthExpired)
         return () => window.removeEventListener('auth:expired', handleAuthExpired)
     }, [])
+
+    useEffect(() => {
+        if (!isAuthenticated) return undefined
+
+        let cancelled = false
+
+        async function refreshCurrentUser() {
+            try {
+                const user = await fetchCurrentUser()
+                if (cancelled) return
+
+                setAuthSession((currentSession) => {
+                    if (!currentSession) return currentSession
+                    const nextSession = { ...currentSession, user }
+                    saveAuthSession(nextSession)
+                    return nextSession
+                })
+            } catch (error) {
+                console.error('Failed to refresh profile:', error)
+            }
+        }
+
+        refreshCurrentUser()
+
+        return () => {
+            cancelled = true
+        }
+    }, [authSession?.token, isAuthenticated])
 
     useEffect(() => {
         if (!isAuthenticated) {
@@ -186,6 +220,7 @@ export default function App() {
         setSongsError('')
         setFavoriteError('')
         setFavoriteUpdatingId(null)
+        setActiveTab('home')
         pendingPlaybackStateRef.current = null
     }
 
@@ -317,22 +352,28 @@ export default function App() {
                 </div>
             </header>
 
-            <HomeDashboard songs={songs} loading={loadingSongs} user={authSession.user} />
+            {activeTab === 'profile' ? (
+                <ProfilePage user={authSession.user} />
+            ) : (
+                <>
+                    <HomeDashboard songs={songs} loading={loadingSongs} user={authSession.user} />
 
-            <div className="content-grid">
-                <SongLibrary
-                    songs={filteredSongs}
-                    selectedSongId={currentSong?._id}
-                    searchQuery={searchQuery}
-                    onSearchChange={setSearchQuery}
-                    onSelectSong={selectSong}
-                    onFavoriteChange={handleFavoriteChange}
-                    favoriteUpdatingId={favoriteUpdatingId}
-                    loading={loadingSongs}
-                    error={songsError}
-                    favoriteError={favoriteError}
-                />
-            </div>
+                    <div className="content-grid">
+                        <SongLibrary
+                            songs={filteredSongs}
+                            selectedSongId={currentSong?._id}
+                            searchQuery={searchQuery}
+                            onSearchChange={setSearchQuery}
+                            onSelectSong={selectSong}
+                            onFavoriteChange={handleFavoriteChange}
+                            favoriteUpdatingId={favoriteUpdatingId}
+                            loading={loadingSongs}
+                            error={songsError}
+                            favoriteError={favoriteError}
+                        />
+                    </div>
+                </>
+            )}
 
             {uploadModalOpen && (
                 <div
@@ -359,18 +400,20 @@ export default function App() {
                 </div>
             )}
 
-            <MusicPlayer
-                key={currentSong?._id || 'empty-player'}
-                song={currentSong}
-                remotePlaybackCommand={remotePlaybackCommand}
-                onLocalPlay={(position, songId) => emitPlaybackEvent('play', songId, position)}
-                onLocalPause={(position, songId) => emitPlaybackEvent('pause', songId, position)}
-                onLocalSeek={(position, songId) => emitPlaybackEvent('seek', songId, position)}
-                onSongEnded={handleSongEnded}
-            />
+            {SHOW_MUSIC_PLAYER && (
+                <MusicPlayer
+                    key={currentSong?._id || 'empty-player'}
+                    song={currentSong}
+                    remotePlaybackCommand={remotePlaybackCommand}
+                    onLocalPlay={(position, songId) => emitPlaybackEvent('play', songId, position)}
+                    onLocalPause={(position, songId) => emitPlaybackEvent('pause', songId, position)}
+                    onLocalSeek={(position, songId) => emitPlaybackEvent('seek', songId, position)}
+                    onSongEnded={handleSongEnded}
+                />
+            )}
 
             <nav className="bottom-navigation" aria-label="Main navigation">
-                <button className="active" type="button" aria-current="page" aria-label="Home">
+                <button className={activeTab === 'home' ? 'active' : ''} type="button" aria-current={activeTab === 'home' ? 'page' : undefined} aria-label="Home" onClick={() => setActiveTab('home')}>
                     <span aria-hidden="true">⌂</span>
                     <span>Home</span>
                 </button>
@@ -382,7 +425,7 @@ export default function App() {
                     <span aria-hidden="true">♫</span>
                     <span>Library</span>
                 </button>
-                <button type="button" aria-label="Profile">
+                <button className={activeTab === 'profile' ? 'active' : ''} type="button" aria-current={activeTab === 'profile' ? 'page' : undefined} aria-label="Profile" onClick={() => setActiveTab('profile')}>
                     <span aria-hidden="true">◯</span>
                     <span>Profile</span>
                 </button>

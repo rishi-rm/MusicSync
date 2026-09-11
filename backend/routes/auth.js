@@ -2,6 +2,7 @@ import express from 'express'
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import User from '../models/User.js'
+import { authenticateToken } from '../middleware/auth.js'
 
 const router = express.Router()
 const JWT_EXPIRES_IN = '7d'
@@ -14,8 +15,42 @@ function buildUserResponse(user) {
     return {
         id: user._id.toString(),
         username: user.username,
-        email: user.email
+        displayName: user.username,
+        email: user.email,
+        listenerId: user.listenerId || null
     }
+}
+
+function generateListenerId() {
+    return String(Math.floor(10000 + Math.random() * 90000))
+}
+
+async function createUserWithListenerId(userData) {
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+        try {
+            return await User.create({ ...userData, listenerId: generateListenerId() })
+        } catch (error) {
+            if (error?.code !== 11000 || !error.keyPattern?.listenerId) throw error
+        }
+    }
+
+    throw new Error('Unable to generate a unique Listener ID.')
+}
+
+async function ensureListenerId(user) {
+    if (user.listenerId) return user
+
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+        try {
+            user.listenerId = generateListenerId()
+            await user.save()
+            return user
+        } catch (error) {
+            if (error?.code !== 11000 || !error.keyPattern?.listenerId) throw error
+        }
+    }
+
+    throw new Error('Unable to generate a unique Listener ID.')
 }
 
 function createToken(userId) {
@@ -46,7 +81,7 @@ router.post('/signup', async (req, res) => {
         }
 
         const passwordHash = await bcrypt.hash(password, 12)
-        const newUser = await User.create({ username, email, passwordHash })
+        const newUser = await createUserWithListenerId({ username, email, passwordHash })
         const token = createToken(newUser._id)
 
         return res.status(201).json({
@@ -84,6 +119,7 @@ router.post('/signin', async (req, res) => {
             return res.status(401).json({ success: false, message: 'Invalid email or password.' })
         }
 
+        await ensureListenerId(user)
         const token = createToken(user._id)
 
         return res.json({
@@ -95,6 +131,19 @@ router.post('/signin', async (req, res) => {
     } catch (error) {
         console.error('Signin failed:', error.message)
         return res.status(500).json({ success: false, message: 'Failed to sign in.' })
+    }
+})
+
+router.get('/me', authenticateToken, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.userId)
+        if (!user) return res.status(401).json({ success: false, message: 'Your session is invalid or expired.' })
+
+        await ensureListenerId(user)
+        return res.json({ success: true, user: buildUserResponse(user) })
+    } catch (error) {
+        console.error('Failed to load current user:', error.message)
+        return res.status(500).json({ success: false, message: 'Failed to load your profile.' })
     }
 })
 

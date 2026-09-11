@@ -21,6 +21,13 @@ const userSchema = new mongoose.Schema({
             message: 'Please provide a valid email address.'
         }
     },
+    listenerId: {
+        type: String,
+        match: /^\d{5}$/,
+        unique: true,
+        sparse: true,
+        immutable: true
+    },
     passwordHash: {
         type: String,
         required: true

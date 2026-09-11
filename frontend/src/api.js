@@ -92,6 +92,19 @@ export async function signIn({ email, password }) {
     return data
 }
 
+export async function fetchCurrentUser() {
+    const response = await fetch(`${API_BASE_URL}/auth/me`, {
+        headers: getAuthHeaders()
+    })
+    const data = await parseResponse(response, 'Failed to load your profile.')
+
+    if (!data.user) {
+        throw new Error('The profile response did not include user data.')
+    }
+
+    return data.user
+}
+
 export async function fetchSongs() {
     const response = await fetch(`${API_BASE_URL}/songs`, {
         headers: getAuthHeaders()

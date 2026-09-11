@@ -58,6 +58,15 @@ h1 span { color: #e59a5c; font-style: italic; }
 .activity-copy strong { overflow: hidden; color: #f8eee2; font-size: 0.98rem; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
 .activity-copy span, .activity-count { overflow: hidden; color: #8fa198; font-family: 'Trebuchet MS', sans-serif; font-size: 0.7rem; text-overflow: ellipsis; white-space: nowrap; }
 .activity-count { flex: 0 0 auto; color: #d8a375; }
+.profile-page { padding: 76px 0 42px; }
+.profile-heading { max-width: 600px; }
+.profile-heading h1 { margin-top: 12px; }
+.profile-card { display: flex; max-width: 720px; min-height: 0; align-items: center; gap: 28px; margin-top: 34px; padding: 30px; }
+.profile-avatar { display: grid; width: 76px; height: 76px; flex: 0 0 auto; place-items: center; border: 1px solid #d78b4e; border-radius: 50%; color: #f0a15b; font-size: 2rem; }
+.profile-details { display: grid; width: min(100%, 430px); gap: 18px; }
+.profile-detail { display: grid; gap: 6px; border-bottom: 1px solid rgba(245, 240, 232, 0.12); padding-bottom: 12px; }
+.profile-detail span { color: #8fa198; font-family: 'Trebuchet MS', sans-serif; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; }
+.profile-detail strong { overflow: hidden; color: #f8eee2; font-size: 1.05rem; font-weight: 400; text-overflow: ellipsis; }
 .content-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 0.8fr); gap: 18px; }
 .panel, .player-panel { border: 1px solid rgba(245, 240, 232, 0.14); background: rgba(13, 20, 19, 0.58); box-shadow: 0 22px 55px rgba(0, 0, 0, 0.16); }
 .panel { min-height: 360px; padding: 26px; }
@@ -134,6 +143,7 @@ h2 { margin-top: 5px; color: #fff7ed; font-size: 1.7rem; font-weight: 400; }
     .intro-block { padding: 58px 0 34px; }
     .home-dashboard { padding: 50px 0 34px; }
     .activity-grid { grid-template-columns: 1fr; }
+    .profile-page { padding: 50px 0 34px; }
     .content-grid { grid-template-columns: 1fr; }
     .panel { padding: 20px; }
     .song-list { max-height: min(52vh, 420px); }
@@ -157,6 +167,8 @@ h2 { margin-top: 5px; color: #fff7ed; font-size: 1.7rem; font-weight: 400; }
     .panel { min-height: 0; padding: 16px; }
     .home-dashboard { padding-top: 42px; }
     .activity-panel { padding: 18px 16px; }
+    .profile-page { padding-top: 42px; }
+    .profile-card { align-items: flex-start; flex-direction: column; gap: 22px; padding: 22px 18px; }
     .modal-backdrop { padding: 12px; }
     .upload-modal { max-height: calc(100vh - 24px); padding: 18px 16px; }
     .section-heading { margin-bottom: 16px; }
