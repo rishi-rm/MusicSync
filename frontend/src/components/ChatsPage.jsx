@@ -15,6 +15,13 @@ function senderId(message) {
     return typeof message.sender === 'string' ? message.sender : message.sender?._id || message.sender?.toString()
 }
 
+function roomInviteRoomId(message) {
+    if (!message) return null
+    if (typeof message.room === 'string') return message.room
+    if (message.room?._id) return message.room._id
+    return null
+}
+
 function messageConversationId(message) {
     return typeof message.conversation === 'string' ? message.conversation : message.conversation?._id || message.conversation?.toString()
 }
@@ -179,6 +186,20 @@ export default function ChatsPage({ token, userId }) {
         }
     }
 
+    async function handleJoinRoomInvite(message) {
+        const roomId = roomInviteRoomId(message)
+        if (!roomId || !message?._id) return
+
+        try {
+            const result = await (await import('../api.js')).joinRoomInvite(roomId, message._id)
+            if (result?.room?.id) {
+                window.location.reload()
+            }
+        } catch (error) {
+            setMessageError(error instanceof Error ? error.message : 'Failed to join the room.')
+        }
+    }
+
     const normalizedQuery = searchQuery.trim().toLowerCase()
     const visibleFriends = friends.filter((friend) => !normalizedQuery || friend.displayName.toLowerCase().includes(normalizedQuery))
 
@@ -193,9 +214,27 @@ export default function ChatsPage({ token, userId }) {
                 <div className="message-list" aria-live="polite">
                     {messagesLoading && <p className="state-message">Loading messages...</p>}
                     {!messagesLoading && messages.length === 0 && <p className="state-message">Start the conversation.</p>}
-                    {messages.map((message) => (
-                        <div className={`message-bubble ${senderId(message) === userId ? 'sent' : 'received'}`} key={message._id}>{message.content}</div>
-                    ))}
+                    {messages.map((message) => {
+                        const isRoomInvite = message.kind === 'room_invite'
+                        const roomId = roomInviteRoomId(message)
+
+                        return (
+                            <div className={`message-bubble ${senderId(message) === userId ? 'sent' : 'received'}${isRoomInvite ? ' room-invite-bubble' : ''}`} key={message._id}>
+                                {isRoomInvite ? (
+                                    <div className="room-invite-content">
+                                        <p>{message.content}</p>
+                                        {roomId && (
+                                            <button type="button" className="join-room-button" onClick={() => handleJoinRoomInvite(message)}>
+                                                Join room
+                                            </button>
+                                        )}
+                                    </div>
+                                ) : (
+                                    message.content
+                                )}
+                            </div>
+                        )
+                    })}
                     <div ref={messagesEndRef} />
                 </div>
                 {messageError && <p className="message-error error-message">{messageError}</p>}

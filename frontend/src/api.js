@@ -181,6 +181,62 @@ export async function fetchChatInbox() {
     }
 }
 
+export async function createRoom() {
+    const response = await fetch(`${API_BASE_URL}/rooms`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' })
+    })
+    const data = await parseResponse(response, 'Failed to create room.')
+    if (!data.room) throw new Error('The room response did not include the new room.')
+    return data.room
+}
+
+export async function fetchRoom(roomId) {
+    const response = await fetch(`${API_BASE_URL}/rooms/${encodeURIComponent(roomId)}`, {
+        headers: getAuthHeaders()
+    })
+    const data = await parseResponse(response, 'Failed to load room.')
+    return data.room
+}
+
+export async function fetchRoomPlaylist(roomId) {
+    const response = await fetch(`${API_BASE_URL}/rooms/${encodeURIComponent(roomId)}/playlist`, {
+        headers: getAuthHeaders()
+    })
+    const data = await parseResponse(response, 'Failed to load room playlist.')
+    return {
+        roomId: data.roomId,
+        playlist: Array.isArray(data.playlist) ? data.playlist : []
+    }
+}
+
+export async function sendRoomInvite(roomId, friendId) {
+    const response = await fetch(`${API_BASE_URL}/rooms/${encodeURIComponent(roomId)}/invite`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ friendId })
+    })
+    return parseResponse(response, 'Failed to send room invite.')
+}
+
+export async function joinRoomInvite(roomId, messageId) {
+    const response = await fetch(`${API_BASE_URL}/rooms/${encodeURIComponent(roomId)}/join`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ messageId })
+    })
+    const data = await parseResponse(response, 'Failed to join room.')
+    return data
+}
+
+export async function leaveRoom(roomId) {
+    const response = await fetch(`${API_BASE_URL}/rooms/${encodeURIComponent(roomId)}/leave`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' })
+    })
+    return parseResponse(response, 'Failed to leave room.')
+}
+
 export async function lookupFriend(listenerId) {
     const response = await fetch(`${API_BASE_URL}/chat/lookup?listenerId=${encodeURIComponent(listenerId)}`, {
         headers: getAuthHeaders()

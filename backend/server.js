@@ -12,8 +12,10 @@ import { r2Client } from './r2.js'
 import { connectDB } from './db.js'
 import { authenticateToken } from './middleware/auth.js'
 import Song from './models/Song.js'
+import Room from './models/Room.js'
 import authRoutes from './routes/auth.js'
 import chatRoutes from './routes/chat.js'
+import roomRoutes from './routes/rooms.js'
 import { getConversationForUser } from './services/chatService.js'
 
 dotenv.config()
@@ -55,6 +57,7 @@ const PORT = process.env.PORT || 3000
 
 app.set('io', io)
 app.use('/chat', chatRoutes)
+app.use('/rooms', roomRoutes)
 
 app.get('/', (req, res) => { res.send('running') })
 
@@ -451,6 +454,75 @@ io.on('connection', (socket) => {
 
     socket.on('chat:leave', (conversationId) => {
         if (typeof conversationId === 'string') socket.leave(`conversation:${conversationId}`)
+    })
+
+    socket.on('room:join', async (roomId, callback) => {
+        try {
+            if (!roomId || typeof roomId !== 'string') {
+                throw Object.assign(new Error('Invalid room ID.'), { statusCode: 400 })
+            }
+
+            const room = await Room.findById(roomId)
+            if (!room) {
+                throw Object.assign(new Error('Room not found.'), { statusCode: 404 })
+            }
+
+            if (!room.members.some((memberId) => memberId.toString() === socket.userId)) {
+                throw Object.assign(new Error('You are not a member of this room.'), { statusCode: 403 })
+            }
+
+            socket.join(`room:${room._id.toString()}`)
+            callback?.({ success: true, roomId: room._id.toString() })
+        } catch (error) {
+            callback?.({ success: false, message: error.message || 'Unable to join room.' })
+        }
+    })
+
+    socket.on('room:leave', (roomId) => {
+        if (typeof roomId === 'string') socket.leave(`room:${roomId}`)
+    })
+
+    socket.on('room:select_song', async (data, callback) => {
+        try {
+            if (!data || typeof data !== 'object') {
+                throw Object.assign(new Error('Invalid room playback payload.'), { statusCode: 400 })
+            }
+
+            const room = await Room.findById(data.roomId)
+            if (!room) {
+                throw Object.assign(new Error('Room not found.'), { statusCode: 404 })
+            }
+
+            if (!room.members.some((memberId) => memberId.toString() === socket.userId)) {
+                throw Object.assign(new Error('You are not a member of this room.'), { statusCode: 403 })
+            }
+
+            const songId = data.songId || null
+            const position = Number.isFinite(Number(data.position)) ? Number(data.position) : 0
+            const isPlaying = data.shouldPlay !== false
+
+            room.playback = {
+                songId: songId || null,
+                isPlaying,
+                position,
+                updatedAt: new Date()
+            }
+            room.lastActivity = new Date()
+            await room.save()
+
+            const payload = {
+                roomId: room._id.toString(),
+                songId: room.playback.songId ? room.playback.songId.toString() : null,
+                isPlaying: room.playback.isPlaying,
+                position: room.playback.position,
+                updatedAt: room.playback.updatedAt
+            }
+
+            io.to(`room:${room._id.toString()}`).emit('room:playback_state', payload)
+            callback?.({ success: true, room: payload })
+        } catch (error) {
+            callback?.({ success: false, message: error.message || 'Room playback update failed.' })
+        }
     })
 
     socket.on('change_current_song', (data) => {

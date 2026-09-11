@@ -18,6 +18,22 @@ const messageSchema = new mongoose.Schema({
         required: true,
         trim: true,
         maxlength: 4000
+    },
+    kind: {
+        type: String,
+        enum: ['text', 'room_invite'],
+        default: 'text',
+        index: true
+    },
+    room: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Room',
+        default: null
+    },
+    invitee: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null
     }
 }, { timestamps: true })
 

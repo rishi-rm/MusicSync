@@ -2,7 +2,7 @@ function songSubtitle(song) {
     return [song.artist || 'Unknown Artist', song.album || 'Single'].join(' · ')
 }
 
-export default function HomeDashboard({ songs, loading, user }) {
+export default function HomeDashboard({ songs, loading, user, recentChats = [], recentChatsLoading = false, onCreateRoom }) {
     const frequentlyListened = songs
         .filter((song) => Number(song.playCount) > 0)
         .sort((left, right) => Number(right.playCount) - Number(left.playCount))
@@ -13,7 +13,10 @@ export default function HomeDashboard({ songs, loading, user }) {
         <section className="home-dashboard" aria-labelledby="home-heading">
             <div className="home-intro">
                 <p className="eyebrow">Your listening room</p>
-                <h1 id="home-heading">Welcome back, <span>{displayName}</span></h1>
+                <div className="home-title-row">
+                    <h1 id="home-heading">Welcome back, <span>{displayName}</span></h1>
+                    <button type="button" className="primary-button create-room-button" onClick={onCreateRoom}>Create Room</button>
+                </div>
                 <p className="intro-copy">A small view of what is moving through your room.</p>
             </div>
 
@@ -55,7 +58,24 @@ export default function HomeDashboard({ songs, loading, user }) {
                         </div>
                         <span className="activity-icon" aria-hidden="true">⌁</span>
                     </div>
-                    <p className="state-message">Your recent conversations will appear here when chat is available.</p>
+
+                    {recentChatsLoading && <p className="state-message">Loading your recent chats...</p>}
+                    {!recentChatsLoading && recentChats.length === 0 && (
+                        <p className="state-message">No DM conversations yet. Add a friend to start a conversation.</p>
+                    )}
+                    {!recentChatsLoading && recentChats.length > 0 && (
+                        <div className="activity-list">
+                            {recentChats.slice(0, 2).map((friend) => (
+                                <div className="activity-row" key={friend.id || friend.conversationId || friend.displayName}>
+                                    <div className="friend-avatar" aria-hidden="true">{friend.displayName?.charAt(0)?.toUpperCase() || 'F'}</div>
+                                    <div className="activity-copy">
+                                        <strong>{friend.displayName}</strong>
+                                        <span>{friend.latestMessage || 'No messages yet'}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </section>
             </div>
         </section>

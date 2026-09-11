@@ -2,10 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
 import {
     clearStoredAuthSession,
+    createRoom,
     deleteSong,
+    fetchChatInbox,
     fetchCurrentUser,
     fetchSongs,
     getStoredAuthSession,
+    leaveRoom,
     saveAuthSession,
     SOCKET_URL,
     renameSong,
@@ -16,6 +19,7 @@ import ChatsPage from './components/ChatsPage.jsx'
 import HomeDashboard from './components/HomeDashboard.jsx'
 import MusicPlayer from './components/MusicPlayer.jsx'
 import ProfilePage from './components/ProfilePage.jsx'
+import RoomPage from './components/RoomPage.jsx'
 import SongLibrary from './components/SongLibrary.jsx'
 import UploadSong from './components/UploadSong.jsx'
 
@@ -39,6 +43,9 @@ export default function App() {
     const [renameTitle, setRenameTitle] = useState('')
     const [songActionLoading, setSongActionLoading] = useState(false)
     const [songActionError, setSongActionError] = useState('')
+    const [recentChats, setRecentChats] = useState([])
+    const [recentChatsLoading, setRecentChatsLoading] = useState(true)
+    const [activeRoomId, setActiveRoomId] = useState(null)
     const songsRef = useRef([])
     const socketRef = useRef(null)
     const pendingPlaybackStateRef = useRef(null)
@@ -98,6 +105,43 @@ export default function App() {
         }
 
         refreshCurrentUser()
+
+        return () => {
+            cancelled = true
+        }
+    }, [authSession?.token, isAuthenticated])
+
+    useEffect(() => {
+        if (!isAuthenticated) {
+            setLoadingSongs(false)
+            setRecentChats([])
+            setRecentChatsLoading(false)
+            return undefined
+        }
+
+        let cancelled = false
+
+        async function loadRecentChats() {
+            setRecentChatsLoading(true)
+            try {
+                const inbox = await fetchChatInbox()
+                if (!cancelled) {
+                    const sortedFriends = [...(inbox.friends || [])].sort((left, right) => {
+                        const leftDate = left.latestMessageAt ? new Date(left.latestMessageAt).getTime() : 0
+                        const rightDate = right.latestMessageAt ? new Date(right.latestMessageAt).getTime() : 0
+                        return rightDate - leftDate
+                    })
+                    setRecentChats(sortedFriends.slice(0, 2))
+                }
+            } catch (error) {
+                console.error('Failed to load recent chats:', error)
+                if (!cancelled) setRecentChats([])
+            } finally {
+                if (!cancelled) setRecentChatsLoading(false)
+            }
+        }
+
+        void loadRecentChats()
 
         return () => {
             cancelled = true
@@ -221,6 +265,28 @@ export default function App() {
         saveAuthSession(session)
     }
 
+    async function handleCreateRoom() {
+        try {
+            const room = await createRoom()
+            setActiveRoomId(room.id)
+            setActiveTab('home')
+        } catch (error) {
+            setSongActionError(error instanceof Error ? error.message : 'Failed to create room.')
+        }
+    }
+
+    async function handleLeaveRoom() {
+        if (!activeRoomId) return
+        try {
+            await leaveRoom(activeRoomId)
+        } catch (error) {
+            console.error('Failed to leave room:', error)
+        } finally {
+            setActiveRoomId(null)
+            setActiveTab('home')
+        }
+    }
+
     function handleLogout() {
         clearStoredAuthSession()
         setAuthSession(null)
@@ -232,6 +298,9 @@ export default function App() {
         setFavoriteUpdatingId(null)
         setRenameTarget(null)
         setSongActionError('')
+        setRecentChats([])
+        setRecentChatsLoading(false)
+        setActiveRoomId(null)
         setActiveTab('home')
         pendingPlaybackStateRef.current = null
     }
@@ -402,7 +471,9 @@ export default function App() {
                 </div>
             </header>
 
-            {activeTab === 'profile' ? (
+            {activeRoomId ? (
+                <RoomPage roomId={activeRoomId} socket={socketRef.current} onLeaveRoom={handleLeaveRoom} />
+            ) : activeTab === 'profile' ? (
                 <ProfilePage user={authSession.user} />
             ) : activeTab === 'chats' ? (
                 <ChatsPage token={authSession.token} userId={authSession.user.id} />
@@ -433,7 +504,14 @@ export default function App() {
                     )}
                 </section>
             ) : (
-                <HomeDashboard songs={songs} loading={loadingSongs} user={authSession.user} />
+                <HomeDashboard
+                    songs={songs}
+                    loading={loadingSongs}
+                    user={authSession.user}
+                    recentChats={recentChats}
+                    recentChatsLoading={recentChatsLoading}
+                    onCreateRoom={handleCreateRoom}
+                />
             )}
 
             {renameTarget && (
@@ -497,19 +575,19 @@ export default function App() {
             )}
 
             <nav className="bottom-navigation" aria-label="Main navigation">
-                <button className={activeTab === 'home' ? 'active' : ''} type="button" aria-current={activeTab === 'home' ? 'page' : undefined} aria-label="Home" onClick={() => setActiveTab('home')}>
+                <button className={activeTab === 'home' && !activeRoomId ? 'active' : ''} type="button" aria-current={activeTab === 'home' && !activeRoomId ? 'page' : undefined} aria-label="Home" onClick={() => { setActiveRoomId(null); setActiveTab('home') }}>
                     <span aria-hidden="true">⌂</span>
                     <span>Home</span>
                 </button>
-                <button className={activeTab === 'chats' ? 'active' : ''} type="button" aria-current={activeTab === 'chats' ? 'page' : undefined} aria-label="Chats" onClick={() => setActiveTab('chats')}>
+                <button className={activeTab === 'chats' ? 'active' : ''} type="button" aria-current={activeTab === 'chats' ? 'page' : undefined} aria-label="Chats" onClick={() => { setActiveRoomId(null); setActiveTab('chats') }}>
                     <span aria-hidden="true">⌁</span>
                     <span>Chats</span>
                 </button>
-                <button className={activeTab === 'library' ? 'active' : ''} type="button" aria-current={activeTab === 'library' ? 'page' : undefined} aria-label="Music library" onClick={() => setActiveTab('library')}>
+                <button className={activeTab === 'library' ? 'active' : ''} type="button" aria-current={activeTab === 'library' ? 'page' : undefined} aria-label="Music library" onClick={() => { setActiveRoomId(null); setActiveTab('library') }}>
                     <span aria-hidden="true">♫</span>
                     <span>Library</span>
                 </button>
-                <button className={activeTab === 'profile' ? 'active' : ''} type="button" aria-current={activeTab === 'profile' ? 'page' : undefined} aria-label="Profile" onClick={() => setActiveTab('profile')}>
+                <button className={activeTab === 'profile' ? 'active' : ''} type="button" aria-current={activeTab === 'profile' ? 'page' : undefined} aria-label="Profile" onClick={() => { setActiveRoomId(null); setActiveTab('profile') }}>
                     <span aria-hidden="true">◯</span>
                     <span>Profile</span>
                 </button>

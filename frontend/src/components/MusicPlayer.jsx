@@ -9,7 +9,7 @@ function formatTime(seconds) {
     return `${minutes}:${remainingSeconds}`
 }
 
-export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, onLocalPause, onLocalSeek, onSongEnded }) {
+export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, onLocalPause, onLocalSeek, onSongEnded, compact = false }) {
     const audioRef = useRef(null)
     const pendingRemotePlayRef = useRef(false)
     const suppressPlayEventRef = useRef(false)
@@ -221,7 +221,7 @@ export default function MusicPlayer({ song, remotePlaybackCommand, onLocalPlay, 
     const hasSong = Boolean(song?._id)
 
     return (
-        <section className="player-panel" aria-labelledby="player-heading">
+        <section className={`player-panel${compact ? ' compact' : ''}`} aria-labelledby="player-heading">
             <audio ref={audioRef} preload="metadata" />
             <div className="player-art" aria-hidden="true">♫</div>
             <div className="player-copy">
