@@ -306,11 +306,9 @@ export default function App() {
                                     setUploadModalOpen(true)
                                 }}
                             >
-                                <span aria-hidden="true">♫</span>
                                 Upload Music
                             </button>
                             <button type="button" role="menuitem" onClick={handleLogout}>
-                                <span aria-hidden="true">↪</span>
                                 Logout
                             </button>
                         </div>
