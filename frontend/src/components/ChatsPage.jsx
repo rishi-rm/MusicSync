@@ -26,7 +26,7 @@ function messageConversationId(message) {
     return typeof message.conversation === 'string' ? message.conversation : message.conversation?._id || message.conversation?.toString()
 }
 
-export default function ChatsPage({ token, userId }) {
+export default function ChatsPage({ token, userId, onRoomJoined }) {
     const [friends, setFriends] = useState([])
     const [incomingRequests, setIncomingRequests] = useState([])
     const [searchQuery, setSearchQuery] = useState('')
@@ -193,7 +193,12 @@ export default function ChatsPage({ token, userId }) {
         try {
             const result = await (await import('../api.js')).joinRoomInvite(roomId, message._id)
             if (result?.room?.id) {
-                window.location.reload()
+                onRoomJoined?.(result.room.id)
+                return
+            }
+
+            if (result?.room?.roomCode) {
+                onRoomJoined?.(roomId)
             }
         } catch (error) {
             setMessageError(error instanceof Error ? error.message : 'Failed to join the room.')

@@ -117,8 +117,12 @@ h1 span { color: #e59a5c; font-style: italic; }
 .room-invite-bubble { min-width: min(100%, 320px); border-color: rgba(74, 206, 168, 0.45); background: rgba(21, 47, 41, 0.8); }
 .room-invite-content { display: grid; gap: 12px; }
 .room-invite-content p { margin: 0; color: #edf8f0; }
-.join-room-button { border: 1px solid rgba(122, 244, 195, 0.7); border-radius: 999px; background: linear-gradient(135deg, rgba(44, 245, 177, 0.34), rgba(42, 172, 122, 0.55)); box-shadow: 0 0 16px rgba(44, 245, 177, 0.42); color: #f5fffb; padding: 10px 14px; cursor: pointer; font-family: 'Trebuchet MS', sans-serif; font-size: 0.75rem; font-weight: 700; }
-.join-room-button:hover, .join-room-button:focus-visible { outline: none; box-shadow: 0 0 22px rgba(44, 245, 177, 0.55); }
+.join-room-button { border: 1px solid rgba(229, 154, 92, 0.72); border-radius: 999px; background: linear-gradient(135deg, rgba(229, 154, 92, 0.2), rgba(229, 154, 92, 0.38)); box-shadow: 0 0 12px rgba(229, 154, 92, 0.18); color: #f8eee2; padding: 10px 14px; cursor: pointer; font-family: 'Trebuchet MS', sans-serif; font-size: 0.75rem; font-weight: 700; transition: background 160ms ease, box-shadow 160ms ease, transform 100ms ease; }
+.join-room-button:hover, .join-room-button:focus-visible { outline: none; background: linear-gradient(135deg, rgba(229, 154, 92, 0.28), rgba(229, 154, 92, 0.48)); box-shadow: 0 0 18px rgba(229, 154, 92, 0.26); }
+.join-room-button:active { transform: translateY(1px); background: linear-gradient(135deg, rgba(229, 154, 92, 0.34), rgba(229, 154, 92, 0.5)); }
+@media (max-width: 480px) {
+  .join-room-button { width: 100%; }
+}
 .message-composer { display: flex; gap: 10px; border-top: 1px solid rgba(245, 240, 232, 0.14); padding-top: 14px; }
 .message-composer input { min-width: 0; flex: 1; border: 1px solid rgba(245, 240, 232, 0.18); background: rgba(13, 20, 19, 0.65); color: #f8eee2; outline: none; padding: 11px 13px; font-family: 'Trebuchet MS', sans-serif; font-size: 0.8rem; }
 .message-composer input:focus { border-color: rgba(229, 154, 92, 0.55); }

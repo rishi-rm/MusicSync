@@ -25,6 +25,29 @@ import UploadSong from './components/UploadSong.jsx'
 
 const SHOW_MUSIC_PLAYER = false
 const SHOW_MUSIC_LIBRARY = true
+const ACTIVE_ROOM_STORAGE_KEY = 'activeRoomId'
+
+function readStoredActiveRoomId() {
+    if (typeof window === 'undefined') return null
+
+    try {
+        const storedRoomId = localStorage.getItem(ACTIVE_ROOM_STORAGE_KEY)
+        return storedRoomId || null
+    } catch {
+        return null
+    }
+}
+
+function persistActiveRoomId(roomId) {
+    if (typeof window === 'undefined') return
+
+    if (!roomId) {
+        localStorage.removeItem(ACTIVE_ROOM_STORAGE_KEY)
+        return
+    }
+
+    localStorage.setItem(ACTIVE_ROOM_STORAGE_KEY, roomId)
+}
 
 export default function App() {
     const [authSession, setAuthSession] = useState(() => getStoredAuthSession())
@@ -45,7 +68,7 @@ export default function App() {
     const [songActionError, setSongActionError] = useState('')
     const [recentChats, setRecentChats] = useState([])
     const [recentChatsLoading, setRecentChatsLoading] = useState(true)
-    const [activeRoomId, setActiveRoomId] = useState(null)
+    const [activeRoomId, setActiveRoomId] = useState(() => readStoredActiveRoomId())
     const songsRef = useRef([])
     const socketRef = useRef(null)
     const pendingPlaybackStateRef = useRef(null)
@@ -65,6 +88,10 @@ export default function App() {
     }
 
     useEffect(() => {
+        persistActiveRoomId(activeRoomId)
+    }, [activeRoomId])
+
+    useEffect(() => {
         function handleAuthExpired() {
             setAuthSession(null)
             setSongs([])
@@ -75,6 +102,8 @@ export default function App() {
             setFavoriteUpdatingId(null)
             setRenameTarget(null)
             setSongActionError('')
+            setActiveRoomId(null)
+            persistActiveRoomId(null)
             setActiveTab('home')
             pendingPlaybackStateRef.current = null
         }
@@ -265,10 +294,19 @@ export default function App() {
         saveAuthSession(session)
     }
 
+    function handleRoomJoined(roomId) {
+        if (!roomId) return
+
+        setActiveRoomId(roomId)
+        persistActiveRoomId(roomId)
+        setActiveTab('home')
+    }
+
     async function handleCreateRoom() {
         try {
             const room = await createRoom()
             setActiveRoomId(room.id)
+            persistActiveRoomId(room.id)
             setActiveTab('home')
         } catch (error) {
             setSongActionError(error instanceof Error ? error.message : 'Failed to create room.')
@@ -283,6 +321,7 @@ export default function App() {
             console.error('Failed to leave room:', error)
         } finally {
             setActiveRoomId(null)
+            persistActiveRoomId(null)
             setActiveTab('home')
         }
     }
@@ -301,6 +340,7 @@ export default function App() {
         setRecentChats([])
         setRecentChatsLoading(false)
         setActiveRoomId(null)
+        persistActiveRoomId(null)
         setActiveTab('home')
         pendingPlaybackStateRef.current = null
     }
@@ -476,7 +516,7 @@ export default function App() {
             ) : activeTab === 'profile' ? (
                 <ProfilePage user={authSession.user} />
             ) : activeTab === 'chats' ? (
-                <ChatsPage token={authSession.token} userId={authSession.user.id} />
+                <ChatsPage token={authSession.token} userId={authSession.user.id} onRoomJoined={handleRoomJoined} />
             ) : activeTab === 'library' ? (
                 <section className="library-page" aria-labelledby="library-page-heading">
                     <div className="library-page-heading">
