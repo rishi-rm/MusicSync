@@ -170,4 +170,41 @@ export async function deleteSong(songId) {
     return parseResponse(response, 'Failed to delete song.')
 }
 
+export async function fetchFriends() {
+    const response = await fetch(`${API_BASE_URL}/friends`, {
+        headers: getAuthHeaders()
+    })
+    const data = await parseResponse(response, 'Failed to load your chats.')
+    return {
+        friends: Array.isArray(data.friends) ? data.friends : [],
+        incomingRequests: Array.isArray(data.incomingRequests) ? data.incomingRequests : []
+    }
+}
+
+export async function lookupFriend(listenerId) {
+    const response = await fetch(`${API_BASE_URL}/friends/lookup?listenerId=${encodeURIComponent(listenerId)}`, {
+        headers: getAuthHeaders()
+    })
+    const data = await parseResponse(response, 'Failed to search for that listener.')
+    return data
+}
+
+export async function sendFriendRequest(listenerId) {
+    const response = await fetch(`${API_BASE_URL}/friends/requests`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ listenerId })
+    })
+    return parseResponse(response, 'Failed to send friend request.')
+}
+
+export async function updateFriendRequest(requestId, status) {
+    const response = await fetch(`${API_BASE_URL}/friends/requests/${requestId}`, {
+        method: 'PATCH',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ status })
+    })
+    return parseResponse(response, 'Failed to update friend request.')
+}
+
 export { API_BASE_URL, SOCKET_URL }

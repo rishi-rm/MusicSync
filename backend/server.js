@@ -12,6 +12,7 @@ import { connectDB } from './db.js'
 import { authenticateToken } from './middleware/auth.js'
 import Song from './models/Song.js'
 import authRoutes from './routes/auth.js'
+import friendRoutes from './routes/friends.js'
 
 dotenv.config()
 
@@ -40,6 +41,7 @@ const frontendOrigins = process.env.FRONTEND_ORIGINS
 app.use(cors({ origin: frontendOrigins }))
 app.use(express.json())
 app.use('/auth', authRoutes)
+app.use('/friends', friendRoutes)
 const server = http.createServer(app)
 
 const io = new Server(server, {

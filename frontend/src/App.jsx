@@ -12,6 +12,7 @@ import {
     updateSongFavorite
 } from './api.js'
 import AuthScreen from './components/AuthScreen.jsx'
+import ChatsPage from './components/ChatsPage.jsx'
 import HomeDashboard from './components/HomeDashboard.jsx'
 import MusicPlayer from './components/MusicPlayer.jsx'
 import ProfilePage from './components/ProfilePage.jsx'
@@ -403,6 +404,8 @@ export default function App() {
 
             {activeTab === 'profile' ? (
                 <ProfilePage user={authSession.user} />
+            ) : activeTab === 'chats' ? (
+                <ChatsPage />
             ) : activeTab === 'library' ? (
                 <section className="library-page" aria-labelledby="library-page-heading">
                     <div className="library-page-heading">
@@ -498,7 +501,7 @@ export default function App() {
                     <span aria-hidden="true">⌂</span>
                     <span>Home</span>
                 </button>
-                <button type="button" aria-label="Chat">
+                <button className={activeTab === 'chats' ? 'active' : ''} type="button" aria-current={activeTab === 'chats' ? 'page' : undefined} aria-label="Chats" onClick={() => setActiveTab('chats')}>
                     <span aria-hidden="true">⌁</span>
                     <span>Chats</span>
                 </button>
