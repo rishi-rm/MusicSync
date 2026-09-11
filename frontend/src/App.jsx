@@ -9,6 +9,7 @@ import {
     updateSongFavorite
 } from './api.js'
 import AuthScreen from './components/AuthScreen.jsx'
+import HomeDashboard from './components/HomeDashboard.jsx'
 import MusicPlayer from './components/MusicPlayer.jsx'
 import SongLibrary from './components/SongLibrary.jsx'
 import UploadSong from './components/UploadSong.jsx'
@@ -316,6 +317,8 @@ export default function App() {
                 </div>
             </header>
 
+            <HomeDashboard songs={songs} loading={loadingSongs} user={authSession.user} />
+
             <div className="content-grid">
                 <SongLibrary
                     songs={filteredSongs}
@@ -365,6 +368,25 @@ export default function App() {
                 onLocalSeek={(position, songId) => emitPlaybackEvent('seek', songId, position)}
                 onSongEnded={handleSongEnded}
             />
+
+            <nav className="bottom-navigation" aria-label="Main navigation">
+                <button className="active" type="button" aria-current="page" aria-label="Home">
+                    <span aria-hidden="true">⌂</span>
+                    <span>Home</span>
+                </button>
+                <button type="button" aria-label="Chat">
+                    <span aria-hidden="true">⌁</span>
+                    <span>Chat</span>
+                </button>
+                <button type="button" aria-label="Music library">
+                    <span aria-hidden="true">♫</span>
+                    <span>Library</span>
+                </button>
+                <button type="button" aria-label="Profile">
+                    <span aria-hidden="true">◯</span>
+                    <span>Profile</span>
+                </button>
+            </nav>
         </main>
     )
 }
