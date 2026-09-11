@@ -9,6 +9,7 @@ import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectComm
 import { Server } from 'socket.io'
 import { r2Client } from './r2.js'
 import { connectDB } from './db.js'
+import { authenticateToken } from './middleware/auth.js'
 import Song from './models/Song.js'
 import authRoutes from './routes/auth.js'
 
@@ -58,9 +59,9 @@ app.get('/health', (req, res) => {
     })
 })
 
-app.get('/songs', async (req, res) => {
+app.get('/songs', authenticateToken, async (req, res) => {
     try {
-        const songs = await Song.find()
+        const songs = await Song.find({ uploadedBy: req.user.userId }).sort({ createdAt: -1 })
         return res.json({ success: true, songs })
     } catch (error) {
         console.error('Failed to retrieve songs:', error.message)
@@ -68,7 +69,7 @@ app.get('/songs', async (req, res) => {
     }
 })
 
-app.patch('/songs/:id/favorite', async (req, res) => {
+app.patch('/songs/:id/favorite', authenticateToken, async (req, res) => {
     const { id: songId } = req.params
 
     if (!mongoose.Types.ObjectId.isValid(songId)) {
@@ -80,9 +81,9 @@ app.patch('/songs/:id/favorite', async (req, res) => {
     }
 
     try {
-        const song = await Song.findById(songId)
+        const song = await Song.findOne({ _id: songId, uploadedBy: req.user.userId })
         if (!song) {
-            return res.status(404).json({ success: false, message: 'Song not found.' })
+            return res.status(404).json({ success: false, message: 'Song not found in your library.' })
         }
 
         song.isFavorite = req.body.isFavorite
@@ -250,7 +251,7 @@ app.get('/songs/:id/stream', async (req, res) => {
     object.Body.pipe(res)
 })
 
-app.post('/upload', upload.array('song', 50), async (req, res, next) => {
+app.post('/upload', authenticateToken, upload.array('song', 50), async (req, res, next) => {
     if (!req.files?.length) {
         return res.status(400).json({ success: false, message: 'No song files were uploaded.' })
     }
@@ -289,6 +290,7 @@ app.post('/upload', upload.array('song', 50), async (req, res, next) => {
 
     try {
         const songs = await Song.create(files.map(({ file, title, r2Key }) => ({
+            uploadedBy: req.user.userId,
             title,
             artist: artist || undefined,
             album: album || null,
@@ -311,6 +313,61 @@ app.post('/upload', upload.array('song', 50), async (req, res, next) => {
 
         console.error('Failed to save song metadata:', error.message)
         return res.status(500).json({ success: false, message: 'Failed to save song metadata.' })
+    }
+})
+
+app.patch('/songs/:id', authenticateToken, async (req, res) => {
+    const { id: songId } = req.params
+    const title = typeof req.body?.title === 'string' ? req.body.title.trim() : ''
+
+    if (!mongoose.Types.ObjectId.isValid(songId)) {
+        return res.status(400).json({ success: false, message: 'Invalid song ID.' })
+    }
+
+    if (!title) {
+        return res.status(400).json({ success: false, message: 'Song title is required.' })
+    }
+
+    try {
+        const song = await Song.findOneAndUpdate(
+            { _id: songId, uploadedBy: req.user.userId },
+            { $set: { title } },
+            { new: true, runValidators: true }
+        )
+
+        if (!song) return res.status(404).json({ success: false, message: 'Song not found in your library.' })
+        return res.json({ success: true, song })
+    } catch (error) {
+        console.error('Failed to rename song:', error.message)
+        return res.status(500).json({ success: false, message: 'Failed to rename song.' })
+    }
+})
+
+app.delete('/songs/:id', authenticateToken, async (req, res) => {
+    const { id: songId } = req.params
+
+    if (!mongoose.Types.ObjectId.isValid(songId)) {
+        return res.status(400).json({ success: false, message: 'Invalid song ID.' })
+    }
+
+    try {
+        const song = await Song.findOne({ _id: songId, uploadedBy: req.user.userId })
+        if (!song) return res.status(404).json({ success: false, message: 'Song not found in your library.' })
+
+        await r2Client.send(new DeleteObjectCommand({
+            Bucket: process.env.R2_BUCKET_NAME,
+            Key: song.r2Key
+        }))
+
+        const deletionResult = await Song.deleteOne({ _id: song._id, uploadedBy: req.user.userId })
+        if (deletionResult.deletedCount !== 1) {
+            return res.status(500).json({ success: false, message: 'The MP3 was removed from storage, but its library metadata could not be removed.' })
+        }
+
+        return res.json({ success: true, songId: song._id.toString() })
+    } catch (error) {
+        console.error('Failed to delete song:', error.message)
+        return res.status(502).json({ success: false, message: 'Song storage or metadata deletion failed. Check the song state before trying again.' })
     }
 })
 

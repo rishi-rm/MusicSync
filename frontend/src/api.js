@@ -150,4 +150,24 @@ export async function updateSongFavorite(songId, isFavorite) {
     return data.song
 }
 
+export async function renameSong(songId, title) {
+    const response = await fetch(`${API_BASE_URL}/songs/${songId}`, {
+        method: 'PATCH',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ title })
+    })
+    const data = await parseResponse(response, 'Failed to rename song.')
+
+    if (!data.song) throw new Error('The rename response did not include the updated song.')
+    return data.song
+}
+
+export async function deleteSong(songId) {
+    const response = await fetch(`${API_BASE_URL}/songs/${songId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+    })
+    return parseResponse(response, 'Failed to delete song.')
+}
+
 export { API_BASE_URL, SOCKET_URL }

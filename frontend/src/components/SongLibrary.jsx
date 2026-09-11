@@ -10,7 +10,7 @@ function formatDate(dateValue) {
     }).format(new Date(dateValue))
 }
 
-export default function SongLibrary({ songs, selectedSongId, searchQuery, onSearchChange, onSelectSong, onFavoriteChange, favoriteUpdatingId, loading, error, favoriteError }) {
+export default function SongLibrary({ songs, selectedSongId, searchQuery, onSearchChange, onSelectSong, onFavoriteChange, favoriteUpdatingId, loading, error, favoriteError, onUpload, onRename, onDelete }) {
     const [openMenuId, setOpenMenuId] = useState(null)
     const menuRef = useRef(null)
 
@@ -53,16 +53,19 @@ export default function SongLibrary({ songs, selectedSongId, searchQuery, onSear
                 <span className="count-badge">{songs.length}</span>
             </div>
 
-            <label className="search-field">
-                <span className="sr-only">Search in library</span>
-                <span aria-hidden="true">⌕</span>
-                <input
-                    type="search"
-                    placeholder="Search in library"
-                    value={searchQuery}
-                    onChange={(event) => onSearchChange(event.target.value)}
-                />
-            </label>
+            <div className="library-tools">
+                <label className="search-field">
+                    <span className="sr-only">Search in library</span>
+                    <span aria-hidden="true">⌕</span>
+                    <input
+                        type="search"
+                        placeholder="Search in library"
+                        value={searchQuery}
+                        onChange={(event) => onSearchChange(event.target.value)}
+                    />
+                </label>
+                <button className="library-upload-button" type="button" onClick={onUpload}>Upload</button>
+            </div>
 
             {loading && <p className="state-message">Loading your library...</p>}
             {error && <p className="state-message error-message">{error}</p>}
@@ -115,6 +118,17 @@ export default function SongLibrary({ songs, selectedSongId, searchQuery, onSear
                                             <button
                                                 type="button"
                                                 role="menuitem"
+                                                onClick={(event) => {
+                                                    event.stopPropagation()
+                                                    setOpenMenuId(null)
+                                                    onRename(song)
+                                                }}
+                                            >
+                                                Rename
+                                            </button>
+                                            <button
+                                                type="button"
+                                                role="menuitem"
                                                 disabled={isUpdating}
                                                 onClick={(event) => {
                                                     event.stopPropagation()
@@ -123,6 +137,18 @@ export default function SongLibrary({ songs, selectedSongId, searchQuery, onSear
                                                 }}
                                             >
                                                 {isFavorite ? '★ Remove from Favourites' : '☆ Mark as Favourite'}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                role="menuitem"
+                                                className="danger-menu-item"
+                                                onClick={(event) => {
+                                                    event.stopPropagation()
+                                                    setOpenMenuId(null)
+                                                    onDelete(song)
+                                                }}
+                                            >
+                                                Delete
                                             </button>
                                         </div>
                                     )}

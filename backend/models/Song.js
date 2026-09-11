@@ -1,6 +1,11 @@
 import mongoose from 'mongoose'
 
 const songSchema = new mongoose.Schema({
+    uploadedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        index: true
+    },
     title: {
         type: String,
         required: true,

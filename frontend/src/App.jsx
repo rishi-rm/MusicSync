@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { io } from 'socket.io-client'
 import {
     clearStoredAuthSession,
+    deleteSong,
     fetchCurrentUser,
     fetchSongs,
     getStoredAuthSession,
     saveAuthSession,
     SOCKET_URL,
+    renameSong,
     updateSongFavorite
 } from './api.js'
 import AuthScreen from './components/AuthScreen.jsx'
@@ -17,7 +19,7 @@ import SongLibrary from './components/SongLibrary.jsx'
 import UploadSong from './components/UploadSong.jsx'
 
 const SHOW_MUSIC_PLAYER = false
-const SHOW_MUSIC_LIBRARY = false
+const SHOW_MUSIC_LIBRARY = true
 
 export default function App() {
     const [authSession, setAuthSession] = useState(() => getStoredAuthSession())
@@ -32,6 +34,10 @@ export default function App() {
     const [menuOpen, setMenuOpen] = useState(false)
     const [uploadModalOpen, setUploadModalOpen] = useState(false)
     const [activeTab, setActiveTab] = useState('home')
+    const [renameTarget, setRenameTarget] = useState(null)
+    const [renameTitle, setRenameTitle] = useState('')
+    const [songActionLoading, setSongActionLoading] = useState(false)
+    const [songActionError, setSongActionError] = useState('')
     const songsRef = useRef([])
     const socketRef = useRef(null)
     const pendingPlaybackStateRef = useRef(null)
@@ -59,6 +65,8 @@ export default function App() {
             setSongsError('')
             setFavoriteError('')
             setFavoriteUpdatingId(null)
+            setRenameTarget(null)
+            setSongActionError('')
             setActiveTab('home')
             pendingPlaybackStateRef.current = null
         }
@@ -221,6 +229,8 @@ export default function App() {
         setSongsError('')
         setFavoriteError('')
         setFavoriteUpdatingId(null)
+        setRenameTarget(null)
+        setSongActionError('')
         setActiveTab('home')
         pendingPlaybackStateRef.current = null
     }
@@ -246,6 +256,54 @@ export default function App() {
             ...previousSongs.filter((song) => !uploadedSongs.some((item) => item._id === song._id))
         ])
         selectSong(uploadedSongs[0])
+    }
+
+    function openRenameModal(song) {
+        setSongActionError('')
+        setRenameTarget(song)
+        setRenameTitle(song.title)
+    }
+
+    async function handleRenameSubmit(event) {
+        event.preventDefault()
+        const title = renameTitle.trim()
+        if (!renameTarget || !title) {
+            setSongActionError('A song title is required.')
+            return
+        }
+
+        setSongActionLoading(true)
+        setSongActionError('')
+
+        try {
+            const updatedSong = await renameSong(renameTarget._id, title)
+            setSongs((previousSongs) => previousSongs.map((song) => (
+                song._id === updatedSong._id ? updatedSong : song
+            )))
+            setCurrentSong((current) => current?._id === updatedSong._id ? updatedSong : current)
+            setRenameTarget(null)
+        } catch (error) {
+            setSongActionError(error instanceof Error ? error.message : 'Failed to rename song.')
+        } finally {
+            setSongActionLoading(false)
+        }
+    }
+
+    async function handleDeleteSong(song) {
+        if (!window.confirm(`Delete "${song.title}"? This removes the MP3 from storage.`)) return
+
+        setSongActionLoading(true)
+        setSongActionError('')
+
+        try {
+            await deleteSong(song._id)
+            setSongs((previousSongs) => previousSongs.filter((item) => item._id !== song._id))
+            setCurrentSong((current) => current?._id === song._id ? null : current)
+        } catch (error) {
+            setSongActionError(error instanceof Error ? error.message : 'Failed to delete song.')
+        } finally {
+            setSongActionLoading(false)
+        }
     }
 
     async function handleFavoriteChange(song) {
@@ -335,16 +393,6 @@ export default function App() {
                     </button>
                     {menuOpen && (
                         <div className="app-menu" role="menu">
-                            <button
-                                type="button"
-                                role="menuitem"
-                                onClick={() => {
-                                    setMenuOpen(false)
-                                    setUploadModalOpen(true)
-                                }}
-                            >
-                                Upload Music
-                            </button>
                             <button type="button" role="menuitem" onClick={handleLogout}>
                                 Logout
                             </button>
@@ -355,12 +403,14 @@ export default function App() {
 
             {activeTab === 'profile' ? (
                 <ProfilePage user={authSession.user} />
-            ) : (
-                <>
-                    <HomeDashboard songs={songs} loading={loadingSongs} user={authSession.user} />
-
+            ) : activeTab === 'library' ? (
+                <section className="library-page" aria-labelledby="library-page-heading">
+                    <div className="library-page-heading">
+                        <p className="eyebrow">Your collection</p>
+                        <h1 id="library-page-heading">Music library</h1>
+                    </div>
                     {SHOW_MUSIC_LIBRARY && (
-                        <div className="content-grid">
+                        <div className="library-page-content">
                             <SongLibrary
                                 songs={filteredSongs}
                                 selectedSongId={currentSong?._id}
@@ -372,10 +422,36 @@ export default function App() {
                                 loading={loadingSongs}
                                 error={songsError}
                                 favoriteError={favoriteError}
+                                onUpload={() => setUploadModalOpen(true)}
+                                onRename={openRenameModal}
+                                onDelete={handleDeleteSong}
                             />
                         </div>
                     )}
-                </>
+                </section>
+            ) : (
+                <HomeDashboard songs={songs} loading={loadingSongs} user={authSession.user} />
+            )}
+
+            {renameTarget && (
+                <div className="modal-backdrop" role="presentation">
+                    <section className="rename-modal" role="dialog" aria-modal="true" aria-labelledby="rename-modal-title">
+                        <div className="modal-heading">
+                            <h2 id="rename-modal-title">Rename song</h2>
+                            <button type="button" className="modal-close-button" aria-label="Close rename dialog" onClick={() => setRenameTarget(null)}>×</button>
+                        </div>
+                        <form className="rename-form" onSubmit={handleRenameSubmit}>
+                            <label className="form-field">
+                                <span>Song title</span>
+                                <input value={renameTitle} onChange={(event) => setRenameTitle(event.target.value)} autoFocus />
+                            </label>
+                            <button className="primary-button" type="submit" disabled={songActionLoading}>
+                                {songActionLoading ? 'Saving...' : 'Save title'}
+                            </button>
+                            {songActionError && <p className="error-message">{songActionError}</p>}
+                        </form>
+                    </section>
+                </div>
             )}
 
             {uploadModalOpen && (
@@ -403,6 +479,8 @@ export default function App() {
                 </div>
             )}
 
+            {songActionError && !renameTarget && <p className="library-action-error error-message">{songActionError}</p>}
+
             {SHOW_MUSIC_PLAYER && (
                 <MusicPlayer
                     key={currentSong?._id || 'empty-player'}
@@ -422,7 +500,11 @@ export default function App() {
                 </button>
                 <button type="button" aria-label="Chat">
                     <span aria-hidden="true">⌁</span>
-                    <span>Chat</span>
+                    <span>Chats</span>
+                </button>
+                <button className={activeTab === 'library' ? 'active' : ''} type="button" aria-current={activeTab === 'library' ? 'page' : undefined} aria-label="Music library" onClick={() => setActiveTab('library')}>
+                    <span aria-hidden="true">♫</span>
+                    <span>Library</span>
                 </button>
                 <button className={activeTab === 'profile' ? 'active' : ''} type="button" aria-current={activeTab === 'profile' ? 'page' : undefined} aria-label="Profile" onClick={() => setActiveTab('profile')}>
                     <span aria-hidden="true">◯</span>
