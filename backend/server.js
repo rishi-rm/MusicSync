@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 import http from 'node:http'
+import jwt from 'jsonwebtoken'
 import express from 'express'
 import cors from 'cors'
 import dotenv from 'dotenv'
@@ -12,7 +13,8 @@ import { connectDB } from './db.js'
 import { authenticateToken } from './middleware/auth.js'
 import Song from './models/Song.js'
 import authRoutes from './routes/auth.js'
-import friendRoutes from './routes/friends.js'
+import chatRoutes from './routes/chat.js'
+import { getConversationForUser } from './services/chatService.js'
 
 dotenv.config()
 
@@ -41,7 +43,6 @@ const frontendOrigins = process.env.FRONTEND_ORIGINS
 app.use(cors({ origin: frontendOrigins }))
 app.use(express.json())
 app.use('/auth', authRoutes)
-app.use('/friends', friendRoutes)
 const server = http.createServer(app)
 
 const io = new Server(server, {
@@ -51,6 +52,9 @@ const io = new Server(server, {
     }
 })
 const PORT = process.env.PORT || 3000
+
+app.set('io', io)
+app.use('/chat', chatRoutes)
 
 app.get('/', (req, res) => { res.send('running') })
 
@@ -412,12 +416,41 @@ async function selectRandomNextSong(endedSongId) {
     }
 }
 
+io.use((socket, next) => {
+    const token = socket.handshake.auth?.token
+    if (!token) return next(new Error('Authentication required.'))
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET)
+        if (!decoded?.userId) return next(new Error('Authentication failed.'))
+        socket.userId = decoded.userId
+        return next()
+    } catch {
+        return next(new Error('Authentication failed.'))
+    }
+})
+
 io.on('connection', (socket) => {
     console.log('[SOCKET] Client connected:', socket.id)
+    socket.join(`user:${socket.userId}`)
     socket.emit('playback_state', { ...playbackState })
 
     socket.on('disconnect', (reason) => {
         console.log('[SOCKET] Client disconnected:', socket.id, reason)
+    })
+
+    socket.on('chat:join', async (conversationId, callback) => {
+        try {
+            const conversation = await getConversationForUser(conversationId, socket.userId)
+            socket.join(`conversation:${conversation._id.toString()}`)
+            callback?.({ success: true })
+        } catch (error) {
+            callback?.({ success: false, message: error.message })
+        }
+    })
+
+    socket.on('chat:leave', (conversationId) => {
+        if (typeof conversationId === 'string') socket.leave(`conversation:${conversationId}`)
     })
 
     socket.on('change_current_song', (data) => {

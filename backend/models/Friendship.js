@@ -13,9 +13,9 @@ const friendshipSchema = new mongoose.Schema({
     },
     pairKey: {
         type: String,
-        required: true,
+        required: false,
         unique: true,
-        immutable: true
+        sparse: true
     },
     status: {
         type: String,
@@ -25,7 +25,6 @@ const friendshipSchema = new mongoose.Schema({
     }
 }, { timestamps: true })
 
-friendshipSchema.index({ sender: 1, recipient: 1 }, { unique: true })
 friendshipSchema.index({ recipient: 1, status: 1, createdAt: -1 })
 friendshipSchema.index({ sender: 1, status: 1, createdAt: -1 })
 

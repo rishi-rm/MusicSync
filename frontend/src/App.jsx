@@ -405,7 +405,7 @@ export default function App() {
             {activeTab === 'profile' ? (
                 <ProfilePage user={authSession.user} />
             ) : activeTab === 'chats' ? (
-                <ChatsPage />
+                <ChatsPage token={authSession.token} userId={authSession.user.id} />
             ) : activeTab === 'library' ? (
                 <section className="library-page" aria-labelledby="library-page-heading">
                     <div className="library-page-heading">

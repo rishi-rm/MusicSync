@@ -170,8 +170,8 @@ export async function deleteSong(songId) {
     return parseResponse(response, 'Failed to delete song.')
 }
 
-export async function fetchFriends() {
-    const response = await fetch(`${API_BASE_URL}/friends`, {
+export async function fetchChatInbox() {
+    const response = await fetch(`${API_BASE_URL}/chat/inbox`, {
         headers: getAuthHeaders()
     })
     const data = await parseResponse(response, 'Failed to load your chats.')
@@ -182,7 +182,7 @@ export async function fetchFriends() {
 }
 
 export async function lookupFriend(listenerId) {
-    const response = await fetch(`${API_BASE_URL}/friends/lookup?listenerId=${encodeURIComponent(listenerId)}`, {
+    const response = await fetch(`${API_BASE_URL}/chat/lookup?listenerId=${encodeURIComponent(listenerId)}`, {
         headers: getAuthHeaders()
     })
     const data = await parseResponse(response, 'Failed to search for that listener.')
@@ -190,7 +190,7 @@ export async function lookupFriend(listenerId) {
 }
 
 export async function sendFriendRequest(listenerId) {
-    const response = await fetch(`${API_BASE_URL}/friends/requests`, {
+    const response = await fetch(`${API_BASE_URL}/chat/requests`, {
         method: 'POST',
         headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ listenerId })
@@ -199,12 +199,39 @@ export async function sendFriendRequest(listenerId) {
 }
 
 export async function updateFriendRequest(requestId, status) {
-    const response = await fetch(`${API_BASE_URL}/friends/requests/${requestId}`, {
+    const response = await fetch(`${API_BASE_URL}/chat/requests/${requestId}`, {
         method: 'PATCH',
         headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify({ status })
     })
     return parseResponse(response, 'Failed to update friend request.')
+}
+
+export async function openConversation(friendId) {
+    const response = await fetch(`${API_BASE_URL}/chat/conversations/with/${friendId}`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+    })
+    const data = await parseResponse(response, 'Failed to open conversation.')
+    return data.conversation
+}
+
+export async function fetchMessages(conversationId) {
+    const response = await fetch(`${API_BASE_URL}/chat/conversations/${conversationId}/messages`, {
+        headers: getAuthHeaders()
+    })
+    const data = await parseResponse(response, 'Failed to load messages.')
+    return Array.isArray(data.messages) ? data.messages : []
+}
+
+export async function sendMessage(conversationId, content) {
+    const response = await fetch(`${API_BASE_URL}/chat/conversations/${conversationId}/messages`, {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ content })
+    })
+    const data = await parseResponse(response, 'Failed to send message.')
+    return data.message
 }
 
 export { API_BASE_URL, SOCKET_URL }
