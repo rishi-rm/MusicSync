@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { io } from 'socket.io-client'
 import {
     fetchChatInbox,
     fetchMessages,
@@ -7,7 +6,6 @@ import {
     openConversation,
     sendFriendRequest,
     sendMessage,
-    SOCKET_URL,
     updateFriendRequest
 } from '../api.js'
 
@@ -26,7 +24,7 @@ function messageConversationId(message) {
     return typeof message.conversation === 'string' ? message.conversation : message.conversation?._id || message.conversation?.toString()
 }
 
-export default function ChatsPage({ token, userId, onRoomJoined }) {
+export default function ChatsPage({ socket, userId, onRoomJoined }) {
     const [friends, setFriends] = useState([])
     const [incomingRequests, setIncomingRequests] = useState([])
     const [searchQuery, setSearchQuery] = useState('')
@@ -44,7 +42,6 @@ export default function ChatsPage({ token, userId, onRoomJoined }) {
     const [messagesLoading, setMessagesLoading] = useState(false)
     const [messageDraft, setMessageDraft] = useState('')
     const [messageError, setMessageError] = useState('')
-    const socketRef = useRef(null)
     const messagesEndRef = useRef(null)
     const currentConversationIdRef = useRef(null)
     currentConversationIdRef.current = conversation?.id || null
@@ -66,9 +63,8 @@ export default function ChatsPage({ token, userId, onRoomJoined }) {
     useEffect(() => { loadInbox() }, [])
 
     useEffect(() => {
-        if (!token) return undefined
-        const socket = io(SOCKET_URL, { auth: { token } })
-        socketRef.current = socket
+        if (!socket) return undefined
+
         socket.on('chat:message', (message) => {
             setMessages((current) => {
                 if (messageConversationId(message) !== currentConversationIdRef.current) return current
@@ -78,10 +74,10 @@ export default function ChatsPage({ token, userId, onRoomJoined }) {
         })
         socket.on('connect_error', (socketError) => setMessageError(socketError.message))
         return () => {
-            socket.disconnect()
-            socketRef.current = null
+            socket.off('chat:message')
+            socket.off('connect_error')
         }
-    }, [token])
+    }, [socket])
 
     useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
 
@@ -154,7 +150,7 @@ export default function ChatsPage({ token, userId, onRoomJoined }) {
             const history = await fetchMessages(opened.id)
             setConversation(opened)
             setMessages(history)
-            socketRef.current?.emit('chat:join', opened.id)
+            socket?.emit('chat:join', opened.id)
         } catch (openError) {
             setMessageError(openError instanceof Error ? openError.message : 'Failed to open conversation.')
         } finally {
@@ -163,7 +159,7 @@ export default function ChatsPage({ token, userId, onRoomJoined }) {
     }
 
     function closeConversation() {
-        if (conversation?.id) socketRef.current?.emit('chat:leave', conversation.id)
+        if (conversation?.id) socket?.emit('chat:leave', conversation.id)
         setSelectedFriend(null)
         setConversation(null)
         setMessages([])

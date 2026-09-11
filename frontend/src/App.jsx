@@ -17,13 +17,11 @@ import {
 import AuthScreen from './components/AuthScreen.jsx'
 import ChatsPage from './components/ChatsPage.jsx'
 import HomeDashboard from './components/HomeDashboard.jsx'
-import MusicPlayer from './components/MusicPlayer.jsx'
 import ProfilePage from './components/ProfilePage.jsx'
 import RoomPage from './components/RoomPage.jsx'
 import SongLibrary from './components/SongLibrary.jsx'
 import UploadSong from './components/UploadSong.jsx'
 
-const SHOW_MUSIC_PLAYER = false
 const SHOW_MUSIC_LIBRARY = true
 const ACTIVE_ROOM_STORAGE_KEY = 'activeRoomId'
 
@@ -58,7 +56,6 @@ export default function App() {
     const [songsError, setSongsError] = useState('')
     const [favoriteError, setFavoriteError] = useState('')
     const [favoriteUpdatingId, setFavoriteUpdatingId] = useState(null)
-    const [remotePlaybackCommand, setRemotePlaybackCommand] = useState(null)
     const [menuOpen, setMenuOpen] = useState(false)
     const [uploadModalOpen, setUploadModalOpen] = useState(false)
     const [activeTab, setActiveTab] = useState('home')
@@ -69,23 +66,10 @@ export default function App() {
     const [recentChats, setRecentChats] = useState([])
     const [recentChatsLoading, setRecentChatsLoading] = useState(true)
     const [activeRoomId, setActiveRoomId] = useState(() => readStoredActiveRoomId())
-    const songsRef = useRef([])
-    const socketRef = useRef(null)
-    const pendingPlaybackStateRef = useRef(null)
+    const [socket, setSocket] = useState(null)
     const menuRef = useRef(null)
 
     const isAuthenticated = Boolean(authSession?.token && authSession?.user)
-    songsRef.current = songs
-
-    function getPlaybackPosition(state) {
-        const position = Number(state?.position)
-        if (!Number.isFinite(position)) return 0
-        if (!state?.isPlaying) return position
-
-        const updatedAt = Number(state.updatedAt)
-        const elapsed = Number.isFinite(updatedAt) ? Math.max(0, (Date.now() - updatedAt) / 1000) : 0
-        return position + elapsed
-    }
 
     useEffect(() => {
         persistActiveRoomId(activeRoomId)
@@ -105,7 +89,6 @@ export default function App() {
             setActiveRoomId(null)
             persistActiveRoomId(null)
             setActiveTab('home')
-            pendingPlaybackStateRef.current = null
         }
 
         window.addEventListener('auth:expired', handleAuthExpired)
@@ -193,18 +176,6 @@ export default function App() {
                 const loadedSongs = await fetchSongs()
                 if (!cancelled) {
                     setSongs(loadedSongs)
-
-                    const pendingState = pendingPlaybackStateRef.current
-                    const pendingSong = loadedSongs.find((song) => song._id === pendingState?.currentSongId)
-                    if (pendingSong) {
-                        pendingPlaybackStateRef.current = null
-                        setCurrentSong(pendingSong)
-                        setRemotePlaybackCommand({
-                            type: pendingState.isPlaying ? 'play' : 'pause',
-                            songId: pendingState.currentSongId,
-                            position: getPlaybackPosition(pendingState)
-                        })
-                    }
                 }
             } catch (error) {
                 console.error('Failed to load songs:', error)
@@ -223,47 +194,28 @@ export default function App() {
 
     useEffect(() => {
         if (!isAuthenticated) {
-            if (socketRef.current) {
-                socketRef.current.disconnect()
-                socketRef.current = null
-            }
+            setSocket(null)
             return undefined
         }
 
-        const socket = io(SOCKET_URL, { auth: { token: authSession.token } })
-        socketRef.current = socket
+        const nextSocket = io(SOCKET_URL, { auth: { token: authSession.token } })
+        setSocket(nextSocket)
 
-        socket.on('connect', () => {
-            console.log('[SOCKET] Connected:', socket.id)
+        nextSocket.on('connect', () => {
+            console.log('[SOCKET] Connected:', nextSocket.id)
         })
 
-        socket.on('disconnect', (reason) => {
+        nextSocket.on('disconnect', (reason) => {
             console.log('[SOCKET] Disconnected:', reason)
         })
 
-        socket.on('connect_error', (error) => {
+        nextSocket.on('connect_error', (error) => {
             console.error('[SOCKET] Connection error:', error.message)
         })
 
-        socket.on('playback_state', (state) => {
-            console.log('[SOCKET] Received playback state:', state)
-            const remoteSong = songsRef.current.find((song) => song._id === state?.currentSongId)
-            if (!remoteSong) {
-                pendingPlaybackStateRef.current = state
-                return
-            }
-
-            setCurrentSong(remoteSong)
-            setRemotePlaybackCommand({
-                type: state.isPlaying ? 'play' : 'pause',
-                songId: state.currentSongId,
-                position: getPlaybackPosition(state)
-            })
-        })
-
         return () => {
-            socket.disconnect()
-            socketRef.current = null
+            nextSocket.disconnect()
+            setSocket((currentSocket) => currentSocket === nextSocket ? null : currentSocket)
         }
     }, [authSession?.token, isAuthenticated])
 
@@ -342,22 +294,10 @@ export default function App() {
         setActiveRoomId(null)
         persistActiveRoomId(null)
         setActiveTab('home')
-        pendingPlaybackStateRef.current = null
     }
 
-    function selectSong(song, announce = true) {
+    function selectSong(song) {
         setCurrentSong(song)
-        setRemotePlaybackCommand({
-            type: 'play',
-            songId: song._id,
-            position: 0
-        })
-
-        if (announce && socketRef.current?.connected) {
-            const payload = { songId: song._id, shouldPlay: true, position: 0 }
-            console.log('[SOCKET] Emitting song change:', payload)
-            socketRef.current.emit('change_current_song', payload)
-        }
     }
 
     function handleSongUploaded(uploadedSongs) {
@@ -441,25 +381,6 @@ export default function App() {
         }
     }
 
-    function emitPlaybackEvent(event, songId, position) {
-        if (!socketRef.current?.connected || !songId) return
-
-        const payload = {
-            songId,
-            position,
-            timestamp: Date.now()
-        }
-        console.log(`[SOCKET] Emitting ${event}:`, payload)
-        socketRef.current.emit(event, payload)
-    }
-
-    function handleSongEnded(songId) {
-        if (!socketRef.current?.connected || !songId) return
-
-        console.log('[SOCKET] Emitting song ended:', songId)
-        socketRef.current.emit('song_ended', { songId })
-    }
-
     if (!isAuthenticated) {
         return <AuthScreen onAuthenticated={handleAuthenticated} />
     }
@@ -512,11 +433,11 @@ export default function App() {
             </header>
 
             {activeRoomId ? (
-                <RoomPage roomId={activeRoomId} socket={socketRef.current} onLeaveRoom={handleLeaveRoom} />
+                <RoomPage roomId={activeRoomId} socket={socket} onLeaveRoom={handleLeaveRoom} />
             ) : activeTab === 'profile' ? (
                 <ProfilePage user={authSession.user} />
             ) : activeTab === 'chats' ? (
-                <ChatsPage token={authSession.token} userId={authSession.user.id} onRoomJoined={handleRoomJoined} />
+                <ChatsPage socket={socket} userId={authSession.user.id} onRoomJoined={handleRoomJoined} />
             ) : activeTab === 'library' ? (
                 <section className="library-page" aria-labelledby="library-page-heading">
                     <div className="library-page-heading">
@@ -601,18 +522,6 @@ export default function App() {
             )}
 
             {songActionError && !renameTarget && <p className="library-action-error error-message">{songActionError}</p>}
-
-            {SHOW_MUSIC_PLAYER && (
-                <MusicPlayer
-                    key={currentSong?._id || 'empty-player'}
-                    song={currentSong}
-                    remotePlaybackCommand={remotePlaybackCommand}
-                    onLocalPlay={(position, songId) => emitPlaybackEvent('play', songId, position)}
-                    onLocalPause={(position, songId) => emitPlaybackEvent('pause', songId, position)}
-                    onLocalSeek={(position, songId) => emitPlaybackEvent('seek', songId, position)}
-                    onSongEnded={handleSongEnded}
-                />
-            )}
 
             <nav className="bottom-navigation" aria-label="Main navigation">
                 <button className={activeTab === 'home' && !activeRoomId ? 'active' : ''} type="button" aria-current={activeTab === 'home' && !activeRoomId ? 'page' : undefined} aria-label="Home" onClick={() => { setActiveRoomId(null); setActiveTab('home') }}>

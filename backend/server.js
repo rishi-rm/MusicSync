@@ -380,14 +380,7 @@ app.delete('/songs/:id', authenticateToken, async (req, res) => {
     }
 })
 
-const playbackState = {
-    currentSongId: null,
-    isPlaying: false,
-    position: 0,
-    updatedAt: Date.now()
-}
 const roomPlaybackStates = new Map()
-let nextSongSelectionInProgress = false
 
 function buildRoomPlaybackPayload(room, overrides = {}) {
     const roomPlayback = room?.playback || {}
@@ -407,10 +400,6 @@ function buildRoomPlaybackPayload(room, overrides = {}) {
         ...overrides,
         roomId: room._id.toString()
     }
-}
-
-function broadcastPlaybackState() {
-    io.emit('playback_state', { ...playbackState })
 }
 
 async function persistRoomPlaybackState(room, payload) {
@@ -440,33 +429,6 @@ async function persistRoomPlaybackState(room, payload) {
     return authoritativeState
 }
 
-async function selectRandomNextSong(endedSongId) {
-    if (nextSongSelectionInProgress || playbackState.currentSongId !== endedSongId) return
-
-    nextSongSelectionInProgress = true
-
-    try {
-        const songs = await Song.find({}, { _id: 1 })
-        if (playbackState.currentSongId !== endedSongId || songs.length === 0) return
-
-        const nextSongs = songs.length > 1
-            ? songs.filter((song) => song._id.toString() !== endedSongId)
-            : songs
-        const nextSong = nextSongs[Math.floor(Math.random() * nextSongs.length)]
-
-        playbackState.currentSongId = nextSong._id.toString()
-        playbackState.isPlaying = true
-        playbackState.position = 0
-        playbackState.updatedAt = Date.now()
-        console.log('[SOCKET] Broadcasting random next song:', playbackState.currentSongId)
-        broadcastPlaybackState()
-    } catch (error) {
-        console.error('Failed to select a random next song:', error.message)
-    } finally {
-        nextSongSelectionInProgress = false
-    }
-}
-
 io.use((socket, next) => {
     const token = socket.handshake.auth?.token
     if (!token) return next(new Error('Authentication required.'))
@@ -484,7 +446,6 @@ io.use((socket, next) => {
 io.on('connection', (socket) => {
     console.log('[SOCKET] Client connected:', socket.id)
     socket.join(`user:${socket.userId}`)
-    socket.emit('playback_state', { ...playbackState })
 
     socket.on('disconnect', (reason) => {
         console.log('[SOCKET] Client disconnected:', socket.id, reason)
@@ -681,60 +642,6 @@ io.on('connection', (socket) => {
         }
     })
 
-    socket.on('change_current_song', (data) => {
-        const songId = typeof data === 'string' ? data : data?.songId || data?._id
-        if (!songId) return
-
-        const shouldPlay = typeof data === 'string' ? false : data?.shouldPlay !== false
-        const position = Number.isFinite(Number(data?.position)) ? Number(data.position) : 0
-        console.log('[SOCKET] Received song change:', songId, { shouldPlay, position }, 'from', socket.id)
-        playbackState.currentSongId = songId
-        playbackState.isPlaying = shouldPlay
-        playbackState.position = position
-        playbackState.updatedAt = Date.now()
-        console.log('[SOCKET] Broadcasting song change:', songId)
-        broadcastPlaybackState()
-    })
-
-    socket.on('song_ended', (data) => {
-        const songId = data?.songId
-        if (!songId) return
-
-        console.log('[SOCKET] Received song ended:', songId, 'from', socket.id)
-        void selectRandomNextSong(songId)
-    })
-
-    socket.on('pause', (data) => {
-        console.log('[SOCKET] Received pause:', data, 'from', socket.id)
-        const position = Number.isFinite(Number(data?.position)) ? Number(data.position) : playbackState.position
-        if (data?.songId) playbackState.currentSongId = data.songId
-        playbackState.isPlaying = false
-        playbackState.position = position
-        playbackState.updatedAt = Date.now()
-        console.log('[SOCKET] Broadcasting pause:', position)
-        broadcastPlaybackState()
-    })
-
-    socket.on('play', (data) => {
-        console.log('[SOCKET] Received play:', data, 'from', socket.id)
-        const position = Number.isFinite(Number(data?.position)) ? Number(data.position) : playbackState.position
-        if (data?.songId) playbackState.currentSongId = data.songId
-        playbackState.isPlaying = true
-        playbackState.position = position
-        playbackState.updatedAt = Date.now()
-        console.log('[SOCKET] Broadcasting play:', position)
-        broadcastPlaybackState()
-    })
-
-    socket.on('seek', (data) => {
-        console.log('[SOCKET] Received seek:', data, 'from', socket.id)
-        const position = Number.isFinite(Number(data?.position)) ? Number(data.position) : playbackState.position
-        if (data?.songId) playbackState.currentSongId = data.songId
-        playbackState.position = position
-        playbackState.updatedAt = Date.now()
-        console.log('[SOCKET] Broadcasting seek:', position)
-        broadcastPlaybackState()
-    })
 })
 
 app.use((error, req, res, next) => {
